@@ -1,0 +1,27 @@
+[project]
+name = "attachements-detect-system"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi==0.104.1",
+    "jinja2==3.1.6",
+    "openpyxl==3.1.2",
+    "paddleocr==3.3.2",
+    "paddlepaddle==3.2.2",
+    "pillow==12.0.0",
+    "psycopg2-binary==2.9.11",
+    "pycryptodome==3.19.0",
+    "pydantic>=2.12.4",
+    "pydantic-settings>=2.12.0",
+    "pymysql==1.1.0",
+    "pypdf2==3.0.1",
+    "pytesseract==0.3.13",
+    "python-docx==0.8.11",
+    "python-dotenv==1.0.0",
+    "rarfile>=4.2",
+    "requests==2.31.0",
+    "sqlalchemy==2.0.44",
+    "uvicorn[standard]==0.24.0",
+]
