@@ -1,0 +1,2016 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Attachment Detection System</title>
+    <!-- Load Tailwind CSS from local vendor -->
+    <script src="./vendor/tailwindcss-browser@4.js"></script>
+    <!-- Load Chart.js from local vendor -->
+    <script src="./vendor/chart.js"></script>
+    <!-- Load Font Awesome from local vendor -->
+    <link rel="stylesheet" href="./vendor/fontawesome-free-7.1.0/css/all.min.css">
+    <!-- Load Vue 3 from local vendor -->
+    <script src="./vendor/vue.global.min.js"></script>
+    <style>
+        :root {
+            --primary-color: #4f46e5;
+            --primary-hover: #4338ca;
+            --success-color: #22c55e;
+            --warning-color: #f59e0b;
+            --danger-color: #ef4444;
+            --gray-50: #f9fafb;
+            --gray-100: #f3f4f6;
+            --gray-200: #e5e7eb;
+            --gray-300: #d1d5db;
+            --gray-400: #9ca3af;
+            --gray-500: #6b7280;
+            --gray-600: #4b5563;
+            --gray-700: #374151;
+            --gray-800: #1f2937;
+            --gray-900: #111827;
+        }
+        
+        .slide-up-enter-active,
+        .slide-up-leave-active {
+            transition: all 0.3s ease;
+        }
+        
+        .slide-up-enter-from {
+            opacity: 0;
+            transform: translateY(30px);
+        }
+        
+        .slide-up-leave-to {
+            opacity: 0;
+            transform: translateY(-30px);
+        }
+        
+        .fade-enter-active,
+        .fade-leave-active {
+            transition: opacity 0.3s ease;
+        }
+
+        .fade-enter-from,
+        .fade-leave-to {
+            opacity: 0;
+        }
+
+        .notification-enter-active,
+        .notification-leave-active {
+            transition: all 0.3s ease;
+        }
+
+        .notification-enter-from {
+            opacity: 0;
+            transform: translateX(100%);
+        }
+
+        .notification-leave-to {
+            opacity: 0;
+            transform: translateX(100%);
+        }
+
+        /* Progress modal styles */
+        .progress-ring__circle {
+            transition: stroke-dashoffset 0.3s;
+            transform: rotate(-90deg);
+            transform-origin: 50% 50%;
+        }
+
+        /* Animation for progress circle */
+        .progress-ring__circle {
+            animation: progress-pulse 2s infinite ease-in-out;
+        }
+
+        @keyframes progress-pulse {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.8;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <div id="app">
+        <!-- Navigation -->
+        <nav class="bg-gradient-to-r from-blue-700 to-indigo-800 text-white shadow-lg">
+            <div class="container mx-auto px-4">
+                <div class="flex justify-between items-center py-4">
+                    <div class="flex items-center space-x-3">
+                        <div class="p-2 bg-white/20 rounded-full">
+                            <i class="fas fa-file-alt text-xl"></i>
+                        </div>
+                        <div>
+                            <h1 class="text-xl font-bold">Attachment Detection System</h1>
+                            <p class="text-xs text-blue-200">Protecting sensitive data across your sites</p>
+                        </div>
+                    </div>
+                    <div class="flex space-x-1">
+                        <button 
+                            @click="setActiveTab('dashboard')" 
+                            :class="{'bg-blue-900 text-white': activeTab === 'dashboard'}" 
+                            class="px-4 py-2 rounded-lg hover:bg-blue-600 transition flex items-center font-medium"
+                        >
+                            <i class="fas fa-tachometer-alt mr-2"></i> Dashboard
+                        </button>
+                        <button 
+                            @click="setActiveTab('search')" 
+                            :class="{'bg-blue-900 text-white': activeTab === 'search'}" 
+                            class="px-4 py-2 rounded-lg hover:bg-blue-600 transition flex items-center font-medium ml-1"
+                        >
+                            <i class="fas fa-search mr-2"></i> Search
+                        </button>
+                        <button 
+                            @click="setActiveTab('sync')" 
+                            :class="{'bg-blue-900 text-white': activeTab === 'sync'}" 
+                            class="px-4 py-2 rounded-lg hover:bg-blue-600 transition flex items-center font-medium ml-1"
+                        >
+                            <i class="fas fa-sync-alt mr-2"></i> Sync
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Notifications -->
+        <div class="fixed top-4 right-4 z-50 space-y-2">
+            <TransitionGroup name="notification">
+                <div
+                    v-for="notification in notifications"
+                    :key="notification.id"
+                    class="flex items-start p-4 rounded-lg shadow-lg max-w-sm"
+                    :class="{
+                        'bg-blue-100 text-blue-800 border border-blue-200': notification.type === 'info',
+                        'bg-green-100 text-green-800 border border-green-200': notification.type === 'success',
+                        'bg-yellow-100 text-yellow-800 border border-yellow-200': notification.type === 'warning',
+                        'bg-red-100 text-red-800 border border-red-200': notification.type === 'error'
+                    }"
+                >
+                    <i
+                        :class="{
+                            'fas fa-info-circle text-blue-500 mr-2': notification.type === 'info',
+                            'fas fa-check-circle text-green-500 mr-2': notification.type === 'success',
+                            'fas fa-exclamation-triangle text-yellow-500 mr-2': notification.type === 'warning',
+                            'fas fa-exclamation-circle text-red-500 mr-2': notification.type === 'error'
+                        }"
+                    ></i>
+                    <span class="flex-1">{{ notification.message }}</span>
+                    <button @click="removeNotification(notification.id)" class="ml-2 text-gray-600 hover:text-gray-800">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </TransitionGroup>
+        </div>
+
+        <!-- Loading overlay -->
+        <div v-if="loading" class="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
+            <div class="bg-white p-8 rounded-xl shadow-xl flex flex-col items-center">
+                <i class="fas fa-spinner fa-spin text-3xl text-blue-600 mb-4"></i>
+                <p class="text-gray-700 font-medium">Loading...</p>
+            </div>
+        </div>
+
+        <main class="container mx-auto px-4 py-6">
+            <!-- Dashboard Tab -->
+            <Transition name="slide-up" mode="out-in">
+                <div v-if="activeTab === 'dashboard'" key="dashboard">
+                    <div class="mb-6">
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                            <div>
+                                <h2 class="text-2xl font-bold text-gray-800 flex items-center">
+                                    <i class="fas fa-tachometer-alt mr-2 text-blue-600"></i>
+                                    Dashboard
+                                </h2>
+                                <p class="text-gray-600 mt-1">Overview of all sites and their attachments</p>
+                            </div>
+                            <button 
+                                @click="refreshStats" 
+                                class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition flex items-center justify-center"
+                            >
+                                <i class="fas fa-sync-alt mr-2"></i> Refresh
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Stats Cards -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                        <div class="bg-white rounded-xl shadow-md p-6 border-l-4 border-blue-500 transition-all hover:shadow-lg">
+                            <div class="flex items-center">
+                                <div class="p-3 rounded-lg bg-blue-100 text-blue-600 mr-4">
+                                    <i class="fas fa-globe text-xl"></i>
+                                </div>
+                                <div>
+                                    <p class="text-sm font-medium text-gray-600">Total/Sync Sites</p>
+                                    <p class="text-2xl font-bold text-gray-900">{{ formatNumber(stats.total_sites) }} / {{ formatNumber(stats.sync_sites || 0) }}</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-white rounded-xl shadow-md p-6 border-l-4 border-green-500 transition-all hover:shadow-lg">
+                            <div class="flex items-center">
+                                <div class="p-3 rounded-lg bg-green-100 text-green-600 mr-4">
+                                    <i class="fas fa-paperclip text-xl"></i>
+                                </div>
+                                <div>
+                                    <p class="text-sm font-medium text-gray-600">Total Attachments</p>
+                                    <p class="text-2xl font-bold text-gray-900">{{ formatNumber(stats.total_attachments) }}</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-white rounded-xl shadow-md p-6 border-l-4 border-red-500 transition-all hover:shadow-lg">
+                            <div class="flex items-center">
+                                <div class="p-3 rounded-lg bg-red-100 text-red-600 mr-4">
+                                    <i class="fas fa-id-card text-xl"></i>
+                                </div>
+                                <div>
+                                    <p class="text-sm font-medium text-gray-600">With ID Card</p>
+                                    <p class="text-2xl font-bold text-gray-900">{{ formatNumber(stats.attachments_with_id_card) }}</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-white rounded-xl shadow-md p-6 border-l-4 border-yellow-500 transition-all hover:shadow-lg">
+                            <div class="flex items-center">
+                                <div class="p-3 rounded-lg bg-yellow-100 text-yellow-600 mr-4">
+                                    <i class="fas fa-phone text-xl"></i>
+                                </div>
+                                <div>
+                                    <p class="text-sm font-medium text-gray-600">With Phone</p>
+                                    <p class="text-2xl font-bold text-gray-900">{{ formatNumber(stats.attachments_with_phone) }}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Charts Section -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                        <div class="bg-white rounded-xl shadow-md p-6 transition-all hover:shadow-lg">
+                            <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                                <i class="fas fa-chart-bar mr-2 text-blue-600"></i>
+                                Attachments by Site
+                            </h3>
+                            <div class="h-80">
+                                <canvas id="attachmentsChart" class="w-full h-full"></canvas>
+                            </div>
+                        </div>
+                        <div class="bg-white rounded-xl shadow-md p-6 transition-all hover:shadow-lg">
+                            <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                                <i class="fas fa-chart-pie mr-2 text-green-600"></i>
+                                ID Cards & Phones Distribution
+                            </h3>
+                            <div class="h-80">
+                                <canvas id="distributionChart" class="w-full h-full"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Sites Table -->
+                    <div class="bg-white rounded-xl shadow-md overflow-hidden transition-all hover:shadow-lg">
+                        <div class="px-6 py-4 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
+                            <h3 class="text-lg font-semibold text-gray-800 flex items-center">
+                                <i class="fas fa-list mr-2 text-indigo-600"></i>
+                                Sites
+                            </h3>
+                            <div class="text-sm text-gray-600">
+                                Showing {{ sites.length }} sites
+                            </div>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Site Name</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Account</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Domain</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Attachments</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">With ID Card</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">With Phone</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="bg-white divide-y divide-gray-200">
+                                    <tr v-for="site in stats.sites_stats" :key="site.site_id" class="hover:bg-gray-50 transition-colors">
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <div class="text-sm font-medium text-gray-900 truncate max-w-xs" :title="site.site_name">{{ site.site_name }}</div>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <div class="text-sm text-gray-500 truncate max-w-xs" :title="site.site_account || 'N/A'">{{ site.site_account || 'N/A' }}</div>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <div class="text-sm text-gray-500 truncate max-w-xs" :title="site.site_domain">{{ site.site_domain }}</div>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <div class="text-sm text-gray-900">{{ formatNumber(site.total_attachments) }}</div>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <div v-if="site.attachments_with_id_card > 0" class="text-sm text-red-600 font-bold">{{ formatNumber(site.attachments_with_id_card) }}</div>
+                                            <div v-else class="text-sm text-gray-500">0</div>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <div v-if="site.attachments_with_phone > 0" class="text-sm text-yellow-600 font-bold">{{ formatNumber(site.attachments_with_phone) }}</div>
+                                            <div v-else class="text-sm text-gray-500">0</div>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm space-x-2">
+                                            <button 
+                                                @click="processSite(site.site_id)" 
+                                                class="text-blue-600 hover:text-blue-900 hover:bg-blue-50 px-2 py-1 rounded transition" 
+                                                title="Process Attachments"
+                                            >
+                                                <i class="fas fa-cogs"></i>
+                                            </button>
+                                            <button 
+                                                @click="viewSiteAttachments(site.site_id)" 
+                                                class="text-green-600 hover:text-green-900 hover:bg-green-50 px-2 py-1 rounded transition" 
+                                                title="View Attachments"
+                                            >
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                            <button 
+                                                @click="goToSearchWithSite(site.site_id)" 
+                                                class="text-purple-600 hover:text-purple-900 hover:bg-purple-50 px-2 py-1 rounded transition" 
+                                                title="Search Attachments"
+                                            >
+                                                <i class="fas fa-search"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Search Tab -->
+                <div v-else-if="activeTab === 'search'" key="search">
+                    <div class="mb-6">
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                            <div>
+                                <h2 class="text-2xl font-bold text-gray-800 flex items-center">
+                                    <i class="fas fa-search mr-2 text-blue-600"></i>
+                                    Search Attachments
+                                </h2>
+                                <p class="text-gray-600 mt-1">Find attachments based on various criteria</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Search Form -->
+                    <div class="bg-white rounded-xl shadow-md p-6 mb-6 transition-all hover:shadow-lg">
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                            <div class="relative">
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Site</label>
+                                <div class="relative">
+                                    <input
+                                        type="text"
+                                        v-model="searchForm.site_name"
+                                        @focus="searchSites"
+                                        @input="searchSites"
+                                        placeholder="Search site (account, name, domain)..."
+                                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    />
+                                    <i class="fas fa-search absolute right-3 top-3 text-gray-400"></i>
+                                    <div v-if="siteSuggestions.length > 0" class="absolute mt-1 w-full bg-white border border-gray-300 rounded-lg shadow-lg z-20">
+                                        <div
+                                            v-for="site in siteSuggestions"
+                                            :key="site.id"
+                                            @click="selectSite(site)"
+                                            class="px-4 py-2 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0 transition-colors"
+                                        >
+                                            <div class="font-medium">{{ site.name }}</div>
+                                            <div class="text-sm text-gray-500">{{ site.account }} - {{ site.domain }}</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Site Status</label>
+                                <select v-model="searchForm.site_state" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option value="">All Statuses</option>
+                                    <option value="0">Active</option>
+                                    <option value="1">Inactive</option>
+                                    <option value="2">Suspended</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Text Content</label>
+                                <input
+                                    type="text"
+                                    v-model="searchForm.text_content_search"
+                                    placeholder="Search in text content..."
+                                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                />
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">OCR Content</label>
+                                <input
+                                    type="text"
+                                    v-model="searchForm.ocr_content_search"
+                                    placeholder="Search in OCR content..."
+                                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                />
+                            </div>
+                        </div>
+
+                        <!-- Collapsible Advanced Search -->
+                        <div class="mb-4">
+                            <button
+                                @click="showAdvancedSearch = !showAdvancedSearch"
+                                class="flex items-center text-blue-600 hover:text-blue-800 font-medium"
+                            >
+                                <i :class="showAdvancedSearch ? 'fas fa-chevron-up' : 'fas fa-chevron-down'"></i>
+                                <span class="ml-2">Advanced Search</span>
+                            </button>
+
+                            <Transition name="slide-up" mode="out-in">
+                                <div v-show="showAdvancedSearch" class="mt-4 pt-4 border-t border-gray-200">
+                                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 mb-1">Has ID Card</label>
+                                            <select v-model="searchForm.has_id_card" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                                <option value="">Any</option>
+                                                <option value="true">Yes</option>
+                                                <option value="false">No</option>
+                                            </select>
+                                        </div>
+
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 mb-1">Has Phone</label>
+                                            <select v-model="searchForm.has_phone" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                                <option value="">Any</option>
+                                                <option value="true">Yes</option>
+                                                <option value="false">No</option>
+                                            </select>
+                                        </div>
+                                        
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 mb-1">File Extension</label>
+                                            <input
+                                                type="text"
+                                                v-model="searchForm.file_ext"
+                                                placeholder="e.g., pdf, docx..."
+                                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                            />
+                                        </div>
+                                        
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 mb-1">Manual Verification</label>
+                                            <select v-model="searchForm.manual_verified_sensitive" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                                <option value="">All</option>
+                                                <option value="true">Verified</option>
+                                                <option value="false">Not Verified</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                            </Transition>
+                        </div>
+
+                        <div class="flex flex-wrap gap-2">
+                            <button @click="performSearch" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center transition">
+                                <i class="fas fa-search mr-2"></i> Search
+                            </button>
+                            <button @click="resetSearch" class="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 flex items-center transition">
+                                <i class="fas fa-redo mr-2"></i> Reset
+                            </button>
+                            <button @click="showDetectionModal = true" class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 flex items-center transition">
+                                <i class="fas fa-search mr-2"></i> Detect
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Search Results -->
+                    <div class="bg-white rounded-xl shadow-md overflow-hidden transition-all hover:shadow-lg">
+                        <div class="px-6 py-4 bg-gray-50 border-b border-gray-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                            <h3 class="text-lg font-semibold text-gray-800 flex items-center">
+                                <i class="fas fa-list mr-2 text-indigo-600"></i>
+                                Search Results ({{ totalResults }})
+                            </h3>
+                            <div class="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+                                <div class="flex items-center space-x-2">
+                                    <span class="text-sm text-gray-600">Show:</span>
+                                    <select v-model="pagination.limit" @change="performSearch" class="border border-gray-300 rounded px-2 py-1 text-sm">
+                                        <option value="10">10</option>
+                                        <option value="50">50</option>
+                                        <option value="100" selected>100</option>
+                                        <option value="500">500</option>
+                                    </select>
+                                </div>
+                                <div class="text-sm text-gray-600">
+                                    {{ Math.min(pagination.offset + 1, totalResults) }} to {{ Math.min(pagination.offset + pagination.limit, totalResults) }} of {{ totalResults }}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="overflow-x-auto" v-if="attachments.length > 0">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">File Name</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Site</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Extension</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created Date</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Has ID Card</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Has Phone</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Verified Sensitive</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="bg-white divide-y divide-gray-200">
+                                    <tr v-for="attachment in attachments" :key="attachment.id" class="hover:bg-gray-50 transition-colors">
+                                        <td class="px-6 py-4">
+                                            <div 
+                                                class="text-sm font-medium text-blue-600 hover:text-blue-800 cursor-pointer underline" 
+                                                @click="showAttachmentDetails(attachment)" 
+                                                :title="attachment.show_name"
+                                            >
+                                                {{ truncateText(attachment.show_name, 30) }}
+                                            </div>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ truncateText(getSiteName(attachment.site_id), 20) }}</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ attachment.file_ext }}</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ formatDate(attachment.create_date) }}</td>
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <span v-if="attachment.has_id_card" class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
+                                                Yes
+                                            </span>
+                                            <span v-else class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
+                                                No
+                                            </span>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <span v-if="attachment.has_phone" class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                                                Yes
+                                            </span>
+                                            <span v-else class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
+                                                No
+                                            </span>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <span v-if="attachment.manual_verified_sensitive" class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-purple-100 text-purple-800">
+                                                Yes
+                                            </span>
+                                            <span v-else class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
+                                                No
+                                            </span>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm space-x-2">
+                                            <button @click="processAttachment(attachment.id)" class="text-blue-600 hover:text-blue-900 hover:bg-blue-50 px-2 py-1 rounded transition" title="Process">
+                                                <i class="fas fa-cogs"></i>
+                                            </button>
+                                            <button @click="previewAttachment(attachment)" class="text-green-600 hover:text-green-900 hover:bg-green-50 px-2 py-1 rounded transition" title="Preview">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                            <a :href="getPreviewUrl(attachment.url_path)" target="_blank" class="text-green-600 hover:text-green-900 hover:bg-green-50 px-2 py-1 rounded transition" title="Download">
+                                                <i class="fas fa-download"></i>
+                                            </a>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <div v-else class="p-12 text-center">
+                            <i class="fas fa-file-search text-5xl text-gray-300 mb-4"></i>
+                            <h3 class="text-lg font-medium text-gray-900 mb-1">No attachments found</h3>
+                            <p class="text-gray-500">Try adjusting your search criteria</p>
+                        </div>
+
+                        <!-- Pagination -->
+                        <div v-if="totalResults > pagination.limit" class="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
+                            <div class="flex-1 flex justify-between sm:hidden">
+                                <button 
+                                    @click="prevPage" 
+                                    :disabled="pagination.offset === 0" 
+                                    :class="{'pointer-events-none text-gray-400': pagination.offset === 0}" 
+                                    class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+                                >
+                                    Previous
+                                </button>
+                                <button 
+                                    @click="nextPage" 
+                                    :disabled="pagination.offset + pagination.limit >= totalResults" 
+                                    :class="{'pointer-events-none text-gray-400': pagination.offset + pagination.limit >= totalResults}" 
+                                    class="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+                                >
+                                    Next
+                                </button>
+                            </div>
+                            <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                                <div>
+                                    <p class="text-sm text-gray-700">
+                                        Showing {{ Math.min(pagination.offset + 1, totalResults) }} to {{ Math.min(pagination.offset + pagination.limit, totalResults) }} of {{ formatNumber(totalResults) }} results
+                                    </p>
+                                </div>
+                                <div>
+                                    <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                                        <button 
+                                            @click="prevPage" 
+                                            :disabled="pagination.offset === 0" 
+                                            :class="{'pointer-events-none bg-gray-100': pagination.offset === 0}" 
+                                            class="relative inline-flex items-center px-3 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
+                                        >
+                                            <i class="fas fa-chevron-left"></i>
+                                        </button>
+
+                                        <!-- Page numbers -->
+                                        <button
+                                            v-for="n in getPageNumbers()"
+                                            :key="n"
+                                            @click="goToPage(n)"
+                                            :class="{'z-10 bg-blue-50 border-blue-500 text-blue-600': n === getCurrentPage(), 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50': n !== getCurrentPage()}"
+                                            class="relative inline-flex items-center px-4 py-2 border text-sm font-medium"
+                                        >
+                                            {{ n }}
+                                        </button>
+
+                                        <button 
+                                            @click="nextPage" 
+                                            :disabled="pagination.offset + pagination.limit >= totalResults" 
+                                            :class="{'pointer-events-none bg-gray-100': pagination.offset + pagination.limit >= totalResults}" 
+                                            class="relative inline-flex items-center px-3 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
+                                        >
+                                            <i class="fas fa-chevron-right"></i>
+                                        </button>
+                                    </nav>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Sync Tab -->
+                <div v-else-if="activeTab === 'sync'" key="sync">
+                    <div class="mb-6">
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                            <div>
+                                <h2 class="text-2xl font-bold text-gray-800 flex items-center">
+                                    <i class="fas fa-sync-alt mr-2 text-blue-600"></i>
+                                    Synchronization
+                                </h2>
+                                <p class="text-gray-600 mt-1">Sync data from remote database</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-xl shadow-md p-6 transition-all hover:shadow-lg">
+                        <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                            <i class="fas fa-database mr-2 text-green-600"></i>
+                            Sync Remote Data
+                        </h3>
+                        <p class="text-gray-600 mb-6">Synchronize site and attachment information from the remote PostgreSQL database.</p>
+
+                        <!-- Sync Sites Section -->
+                        <div class="mb-8">
+                            <h4 class="font-medium text-gray-800 mb-3 flex items-center">
+                                <i class="fas fa-server mr-2 text-blue-500"></i>
+                                Sync Site Information
+                            </h4>
+                            <p class="text-gray-600 text-sm mb-4">This will sync all site information from the remote database (does not include attachments).</p>
+                            <button @click="syncSites" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center transition disabled:opacity-50" :disabled="syncInProgress">
+                                <i class="fas fa-sync-alt mr-2" :class="{'fa-spin': syncInProgress}"></i>
+                                {{ syncInProgress ? 'Syncing Sites...' : 'Sync All Sites' }}
+                            </button>
+                        </div>
+
+                        <!-- Sync Attachments Section -->
+                        <div class="mb-8">
+                            <h4 class="font-medium text-gray-800 mb-3 flex items-center">
+                                <i class="fas fa-paperclip mr-2 text-purple-500"></i>
+                                Sync Attachments
+                            </h4>
+                            <p class="text-gray-600 text-sm mb-4">Sync attachment information for all sites or a specific site.</p>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                <div class="relative">
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Search Site (Optional)</label>
+                                    <div class="relative">
+                                        <input
+                                            type="text"
+                                            v-model="syncAttachmentsForm.site_name"
+                                            @focus="searchSyncAttachmentSites"
+                                            @input="searchSyncAttachmentSites"
+                                            placeholder="Search site to sync attachments (account, name, domain)..."
+                                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        />
+                                        <i class="fas fa-search absolute right-3 top-3 text-gray-400"></i>
+                                        <div v-if="syncAttachmentSiteSuggestions.length > 0" class="absolute mt-1 w-full bg-white border border-gray-300 rounded-lg shadow-lg z-20">
+                                            <div
+                                                v-for="site in syncAttachmentSiteSuggestions"
+                                                :key="site.id"
+                                                @click="selectSyncAttachmentSite(site)"
+                                                class="px-4 py-2 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0 transition-colors"
+                                            >
+                                                <div class="font-medium">{{ site.name }}</div>
+                                                <div class="text-sm text-gray-500">{{ site.account }} - {{ site.domain }}</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="flex flex-col justify-end">
+                                    <button
+                                        @click="syncAttachments"
+                                        :disabled="syncInProgress"
+                                        class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 disabled:opacity-50 flex items-center justify-center transition"
+                                    >
+                                        <i class="fas fa-sync-alt mr-2" :class="{'fa-spin': syncInProgress}"></i>
+                                        {{ syncAttachmentsForm.site_owner ? 'Sync Selected Site Attachments' : 'Sync All Attachments' }}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div v-if="syncStatus" class="mt-6 p-4 rounded-lg" :class="syncStatus.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'">
+                            <i :class="syncStatus.success ? 'fas fa-check-circle mr-2' : 'fas fa-exclamation-circle mr-2'"></i>
+                            {{ syncStatus.message }}
+                        </div>
+                    </div>
+                </div>
+            </Transition>
+        </main>
+
+        <!-- Attachment Details Modal -->
+        <Teleport to="body">
+            <Transition name="fade">
+                <div v-if="showDetailsModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50" id="details-modal">
+                    <div class="relative top-20 mx-auto p-5 border w-11/12 md:w-3/4 lg:w-1/2 shadow-lg rounded-md bg-white">
+                        <div class="mt-3">
+                            <div class="flex justify-between items-center pb-3 border-b">
+                                <h3 class="text-lg font-semibold text-gray-800 flex items-center">
+                                    <i class="fas fa-file-alt text-blue-500 mr-2"></i>
+                                    Attachment Details
+                                </h3>
+                                <button @click="showDetailsModal = false" class="text-gray-500 hover:text-gray-700">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                            <div class="p-4">
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700">File Name</label>
+                                        <p class="mt-1 text-sm text-gray-900 break-words">{{ selectedAttachment.show_name }}</p>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700">Site</label>
+                                        <p class="mt-1 text-sm text-gray-900">{{ getSiteName(selectedAttachment.site_id) }}</p>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700">File Extension</label>
+                                        <p class="mt-1 text-sm text-gray-900">{{ selectedAttachment.file_ext }}</p>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700">Created Date</label>
+                                        <p class="mt-1 text-sm text-gray-900">{{ formatDate(selectedAttachment.create_date) }}</p>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700">Has ID Card</label>
+                                        <p class="mt-1 text-sm text-gray-900">{{ selectedAttachment.has_id_card ? 'Yes' : 'No' }}</p>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700">Has Phone</label>
+                                        <p class="mt-1 text-sm text-gray-900">{{ selectedAttachment.has_phone ? 'Yes' : 'No' }}</p>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700">Manual Verification</label>
+                                        <p class="mt-1 text-sm text-gray-900">{{ selectedAttachment.manual_verified_sensitive ? 'Verified' : 'Not Verified' }}</p>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700">Verification Notes</label>
+                                        <p class="mt-1 text-sm text-gray-900">{{ selectedAttachment.verification_notes || 'No notes' }}</p>
+                                    </div>
+                                </div>
+                                
+                                <div class="mb-4" v-if="selectedAttachment.text_content">
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Text Content</label>
+                                    <div class="bg-gray-100 p-3 rounded max-h-40 overflow-y-auto">
+                                        <pre class="text-sm text-gray-900 whitespace-pre-wrap break-words">{{ selectedAttachment.text_content }}</pre>
+                                    </div>
+                                </div>
+                                
+                                <div class="mb-4" v-if="selectedAttachment.ocr_content">
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">OCR Content</label>
+                                    <div class="bg-gray-100 p-3 rounded max-h-40 overflow-y-auto">
+                                        <pre class="text-sm text-gray-900 whitespace-pre-wrap break-words">{{ selectedAttachment.ocr_content }}</pre>
+                                    </div>
+                                </div>
+                                
+                                <div class="mb-4" v-if="selectedAttachment.llm_content">
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">AI Analysis</label>
+                                    <div class="bg-gray-100 p-3 rounded max-h-40 overflow-y-auto">
+                                        <pre class="text-sm text-gray-900 whitespace-pre-wrap break-words">{{ selectedAttachment.llm_content }}</pre>
+                                    </div>
+                                </div>
+                                
+                                <div class="mb-4" v-if="!selectedAttachment.text_content && !selectedAttachment.ocr_content && !selectedAttachment.llm_content">
+                                    <p class="text-sm text-gray-600">Content not yet extracted. Process this attachment to extract content.</p>
+                                </div>
+                                
+                                <div class="flex justify-end space-x-2 pt-4">
+                                    <button 
+                                        @click="showDetailsModal = false" 
+                                        class="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition"
+                                    >
+                                        Close
+                                    </button>
+                                    <button 
+                                        @click="processAttachment(selectedAttachment.id)" 
+                                        class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center transition"
+                                    >
+                                        <i class="fas fa-cogs mr-2"></i> Process
+                                    </button>
+                                    <a :href="previewUrl" target="_blank" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center transition">
+                                        <i class="fas fa-download mr-2"></i> Download
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </Transition>
+        </Teleport>
+
+        <!-- Preview Modal -->
+        <Teleport to="body">
+            <Transition name="fade">
+                <div v-if="showPreviewModal" class="fixed inset-0 bg-gray-600 bg-opacity-75 overflow-y-auto h-full w-full z-50" id="preview-modal">
+                    <div class="relative top-10 mx-auto p-5 border w-11/12 md:w-4/5 lg:w-3/4 shadow-lg rounded-md bg-white">
+                        <div class="mt-3">
+                            <div class="flex justify-between items-center pb-3 border-b">
+                                <h3 class="text-lg font-semibold text-gray-800 flex items-center">
+                                    <i class="fas fa-eye text-green-500 mr-2"></i>
+                                    Preview: {{ truncateText(selectedAttachment.show_name, 50) }}
+                                </h3>
+                                <button @click="showPreviewModal = false" class="text-gray-500 hover:text-gray-700">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                            <div class="p-4">
+                                <div class="flex justify-center mb-4">
+                                    <div v-if="isPreviewableImage" class="max-w-full max-h-[70vh]">
+                                        <img :src="previewUrl" :alt="selectedAttachment.show_name" class="max-w-full max-h-[70vh] object-contain">
+                                    </div>
+                                    <div v-else-if="isPreviewablePdf" class="w-full">
+                                        <iframe :src="previewUrl" class="w-full h-[70vh]" type="application/pdf"></iframe>
+                                    </div>
+                                    <div v-else-if="isPreviewableText" class="w-full">
+                                        <pre class="bg-gray-100 p-4 rounded whitespace-pre-wrap max-h-[70vh] overflow-y-auto">{{ selectedAttachment.text_content || 'Content not yet extracted' }}</pre>
+                                    </div>
+                                    <div v-else class="text-center py-10 w-full">
+                                        <i class="fas fa-file text-6xl text-gray-300 mb-4"></i>
+                                        <p class="text-gray-600 text-lg">Preview not available for this file type ({{ selectedAttachment.file_ext }}).</p>
+                                        <p class="text-gray-600 mt-2">Please download the file to view its contents.</p>
+                                        <a :href="previewUrl" target="_blank" class="mt-4 inline-block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+                                            <i class="fas fa-download mr-2"></i> Download File
+                                        </a>
+                                    </div>
+                                </div>
+                                <div class="flex justify-end mt-4">
+                                    <button @click="showPreviewModal = false" class="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition">
+                                        Close
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </Transition>
+        </Teleport>
+
+        <!-- Detection Modal -->
+        <Teleport to="body">
+            <Transition name="fade">
+                <div v-if="showDetectionModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50" id="detection-modal">
+                    <div class="relative top-20 mx-auto p-5 border w-11/12 md:w-3/4 lg:w-1/2 shadow-lg rounded-md bg-white">
+                        <div class="mt-3">
+                            <div class="flex justify-between items-center pb-3 border-b">
+                                <h3 class="text-lg font-semibold text-gray-800 flex items-center">
+                                    <i class="fas fa-search text-purple-500 mr-2"></i>
+                                    Detect Sensitive Information
+                                </h3>
+                                <button @click="showDetectionModal = false" class="text-gray-500 hover:text-gray-700">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                            <div class="p-4">
+                                <div class="mb-4">
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Select Site</label>
+                                    <div class="relative">
+                                        <input
+                                            type="text"
+                                            v-model="detectionForm.site_name"
+                                            @focus="searchDetectionSites"
+                                            @input="searchDetectionSites"
+                                            placeholder="Search site to detect (account, name, domain)..."
+                                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        />
+                                        <i class="fas fa-search absolute right-3 top-3 text-gray-400"></i>
+                                        <div v-if="detectionSiteSuggestions.length > 0" class="absolute mt-1 w-full bg-white border border-gray-300 rounded-lg shadow-lg z-20">
+                                            <div
+                                                v-for="site in detectionSiteSuggestions"
+                                                :key="site.id"
+                                                @click="selectDetectionSite(site)"
+                                                class="px-4 py-2 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0 transition-colors"
+                                            >
+                                                <div class="font-medium">{{ site.name }}</div>
+                                                <div class="text-sm text-gray-500">{{ site.account }} - {{ site.domain }}</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="mb-6">
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Detection Type</label>
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div 
+                                            @click="detectionForm.type = 'normal'" 
+                                            :class="{'ring-2 ring-blue-500': detectionForm.type === 'normal'}"
+                                            class="p-4 border rounded-lg cursor-pointer bg-white hover:bg-blue-50 transition-colors"
+                                        >
+                                            <div class="flex items-center">
+                                                <input 
+                                                    type="radio" 
+                                                    v-model="detectionForm.type" 
+                                                    value="normal" 
+                                                    class="h-4 w-4 text-blue-600 mr-3"
+                                                >
+                                                <label class="font-medium">Normal Detection</label>
+                                            </div>
+                                            <p class="text-sm text-gray-600 mt-2 ml-7">Uses pattern matching to detect ID cards and phone numbers</p>
+                                        </div>
+                                        <div 
+                                            @click="detectionForm.type = 'ai'" 
+                                            :class="{'ring-2 ring-purple-500': detectionForm.type === 'ai'}"
+                                            class="p-4 border rounded-lg cursor-pointer bg-white hover:bg-purple-50 transition-colors"
+                                        >
+                                            <div class="flex items-center">
+                                                <input 
+                                                    type="radio" 
+                                                    v-model="detectionForm.type" 
+                                                    value="ai" 
+                                                    class="h-4 w-4 text-purple-600 mr-3"
+                                                >
+                                                <label class="font-medium">AI Detection</label>
+                                            </div>
+                                            <p class="text-sm text-gray-600 mt-2 ml-7">Uses AI analysis to detect sensitive information in content</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="flex justify-end space-x-2">
+                                    <button @click="showDetectionModal = false" class="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition">
+                                        Cancel
+                                    </button>
+                                    <button
+                                        @click="performDetection"
+                                        :disabled="!detectionForm.site_id"
+                                        class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 flex items-center transition"
+                                    >
+                                        <i class="fas fa-search mr-2"></i> Detect
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </Transition>
+        </Teleport>
+
+        <!-- Progress Modal -->
+        <Teleport to="body">
+            <Transition name="fade">
+                <div v-if="showProgressModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center" id="progress-modal">
+                    <div class="relative top-0 mx-auto p-5 border w-11/12 md:w-1/2 lg:w-1/3 shadow-lg rounded-md bg-white">
+                        <div class="mt-3">
+                            <div class="flex justify-between items-center pb-3 border-b">
+                                <h3 class="text-lg font-semibold text-gray-800 flex items-center">
+                                    <i class="fas fa-search text-purple-500 mr-2"></i>
+                                    Detecting Sensitive Information
+                                </h3>
+                            </div>
+                            <div class="p-6 flex flex-col items-center">
+                                <div class="relative mb-6">
+                                    <div class="w-32 h-32 rounded-full flex items-center justify-center relative">
+                                        <svg class="w-32 h-32" viewBox="0 0 100 100">
+                                            <circle class="text-gray-200 stroke-current" cx="50" cy="50" r="40" fill="none" stroke-width="8" />
+                                            <circle class="text-purple-500 progress-ring__circle stroke-current" cx="50" cy="50" r="40" fill="none" stroke-width="8"
+                                                :stroke-dasharray="circumference"
+                                                :stroke-dashoffset="strokeDashoffset"
+                                                transform="rotate(-90 50 50)" />
+                                        </svg>
+                                        <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center">
+                                            <span class="text-2xl font-bold text-gray-800">{{ progress.current }}</span>
+                                            <span class="text-gray-500">/{{ progress.total }}</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="mb-4 w-full">
+                                    <div class="w-full bg-gray-200 rounded-full h-4">
+                                        <div class="bg-purple-600 h-4 rounded-full transition-all duration-300 ease-in-out"
+                                             :style="{ width: progressPercentage + '%' }"></div>
+                                    </div>
+                                    <div class="text-center mt-2">
+                                        <p class="text-sm font-medium text-gray-700">{{ progress.message }}</p>
+                                    </div>
+                                </div>
+
+                                <div class="flex justify-center">
+                                    <button
+                                        @click="cancelDetection"
+                                        class="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                                        :disabled="progress.status === 'success' || progress.status === 'error'"
+                                    >
+                                        Cancel
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </Transition>
+        </Teleport>
+    </div>
+
+    <script>
+        // Define TypeScript-like type definitions in JSDoc (for documentation purposes)
+        /**
+         * @typedef {Object} SearchForm
+         * @property {number|null} site_id
+         * @property {string} site_state
+         * @property {string} text_content_search
+         * @property {string} ocr_content_search
+         * @property {boolean|null} has_id_card
+         * @property {boolean|null} has_phone
+         * @property {string} site_name
+         * @property {string} file_ext
+         * @property {boolean|null} manual_verified_sensitive
+         */
+        
+        /**
+         * @typedef {Object} Stats
+         * @property {number} total_sites
+         * @property {number} total_attachments
+         * @property {number} attachments_with_id_card
+         * @property {number} attachments_with_phone
+         * @property {Array<Object>} sites_stats
+         */
+        
+        /**
+         * @typedef {Object} Pagination
+         * @property {number} offset
+         * @property {number} limit
+         */
+        
+        /**
+         * @typedef {Object} Attachment
+         * @property {number} id
+         * @property {number} site_id
+         * @property {string} show_name
+         * @property {string} file_path
+         * @property {string} url_path
+         * @property {string} file_ext
+         * @property {string} create_date
+         * @property {string} text_content
+         * @property {string} ocr_content
+         * @property {string} llm_content
+         * @property {boolean} has_id_card
+         * @property {boolean} has_phone
+         * @property {boolean} manual_verified_sensitive
+         * @property {string} verification_notes
+         */
+        
+        const { createApp, ref, onMounted, watch, computed, toRefs } = Vue;
+        
+        createApp({
+            setup() {
+                // State management
+                const state = ref({
+                    activeTab: 'dashboard',
+                    stats: {
+                        total_sites: 0,
+                        total_attachments: 0,
+                        attachments_with_id_card: 0,
+                        attachments_with_phone: 0,
+                        sites_stats: []
+                    },
+                    sites: [],
+                    attachments: [],
+                    siteSuggestions: [],
+                    syncSiteSuggestions: [],
+                    syncAttachmentSiteSuggestions: [],
+                    detectionSiteSuggestions: [],
+                    selectedAttachment: {},
+                    totalResults: 0,
+                    loading: false,
+                    syncInProgress: false,
+                    showAdvancedSearch: false,
+                    showDetailsModal: false,
+                    showPreviewModal: false,
+                    showDetectionModal: false,
+                    showProgressModal: false,
+                    progress: {
+                        current: 0,
+                        total: 0,
+                        message: '',
+                        status: '' // 'processing', 'success', 'error'
+                    },
+                    syncStatus: null,
+                    notifications: [],
+                    cachedSites: [], // Cache for quick site search
+                    searchForm: {
+                        site_id: null,
+                        site_state: '',
+                        text_content_search: '',
+                        ocr_content_search: '',
+                        has_id_card: null,
+                        has_phone: null,
+                        site_name: '',
+                        file_ext: '',
+                        manual_verified_sensitive: null
+                    },
+                    syncForm: {
+                        site_owner: null,
+                        site_name: ''
+                    },
+                    syncAttachmentsForm: {
+                        site_owner: null,
+                        site_name: ''
+                    },
+                    detectionForm: {
+                        site_id: null,
+                        site_name: '',
+                        type: 'normal'
+                    },
+                    pagination: {
+                        offset: 0,
+                        limit: 100
+                    }
+                });
+                
+                const {
+                    activeTab, stats, sites, attachments, siteSuggestions, syncSiteSuggestions,
+                    syncAttachmentSiteSuggestions, detectionSiteSuggestions, selectedAttachment,
+                    totalResults, loading, syncInProgress, showAdvancedSearch, showDetailsModal,
+                    showPreviewModal, showDetectionModal, showProgressModal, progress, syncStatus,
+                    cachedSites, searchForm, syncForm, syncAttachmentsForm, detectionForm, pagination
+                } = toRefs(state.value);
+
+                // Chart references
+                let attachmentsChart = null;
+                let distributionChart = null;
+                
+                // Computed properties
+                const isPreviewableImage = computed(() => {
+                    const ext = selectedAttachment.value.file_ext ? selectedAttachment.value.file_ext.toLowerCase() : '';
+                    return ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp'].includes(ext);
+                });
+                
+                const isPreviewablePdf = computed(() => {
+                    return selectedAttachment.value.file_ext && selectedAttachment.value.file_ext.toLowerCase() === '.pdf';
+                });
+                
+                const isPreviewableText = computed(() => {
+                    const ext = selectedAttachment.value.file_ext ? selectedAttachment.value.file_ext.toLowerCase() : '';
+                    return ['.txt', '.doc', '.docx', '.xls', '.xlsx'].includes(ext);
+                });
+
+                const previewUrl = computed(() => {
+                    return getPreviewUrl(selectedAttachment.value.url_path);
+                });
+
+                // Progress-related computed properties
+                const progressPercentage = computed(() => {
+                    if (progress.value.total === 0) return 0;
+                    return Math.round((progress.value.current / progress.value.total) * 100);
+                });
+
+                const circumference = computed(() => {
+                    return 2 * Math.PI * 40; // radius is 40 from SVG
+                });
+
+                const strokeDashoffset = computed(() => {
+                    if (!circumference.value) return 0;
+                    const offset = circumference.value - (progressPercentage.value / 100) * circumference.value;
+                    return offset < 0 ? 0 : offset;
+                });
+
+                // Lifecycle hooks
+                onMounted(async () => {
+                    await fetchInitialData();
+                });
+                
+                watch(activeTab, (newTab) => {
+                    if (newTab === 'dashboard') {
+                        setTimeout(() => {
+                            renderCharts();
+                        }, 100);
+                    }
+                });
+                
+                // API functions
+                const fetchStats = async () => {
+                    try {
+                        loading.value = true;
+                        const response = await fetch('/api/stats');
+                        if (!response.ok) throw new Error(`API error: ${response.status}`);
+                        stats.value = await response.json();
+                        setTimeout(renderCharts, 100);
+                    } catch (error) {
+                        console.error('Error fetching stats:', error);
+                        addNotification('Error loading statistics: ' + error.message, 'error');
+                    } finally {
+                        loading.value = false;
+                    }
+                };
+                
+                const fetchSites = async () => {
+                    try {
+                        const response = await fetch('/api/sites');
+                        if (!response.ok) throw new Error(`API error: ${response.status}`);
+                        sites.value = await response.json();
+                        // Also populate the cached sites for quick search
+                        cachedSites.value = sites.value.map(site => ({
+                            id: site.id,
+                            owner: site.owner,
+                            name: site.name,
+                            account: site.account,
+                            domain: site.domain
+                        }));
+                    } catch (error) {
+                        console.error('Error fetching sites:', error);
+                        addNotification('Error loading sites: ' + error.message, 'error');
+                    }
+                };
+                
+                const fetchAttachments = async () => {
+                    try {
+                        loading.value = true;
+                        const params = new URLSearchParams({
+                            skip: pagination.value.offset,
+                            limit: pagination.value.limit
+                        });
+                        
+                        // Add search parameters if they exist
+                        if (searchForm.value.site_id) params.append('site_id', searchForm.value.site_id.toString());
+                        if (searchForm.value.site_owner) params.append('site_owner', searchForm.value.site_owner);
+                        if (searchForm.value.site_state !== '') params.append('site_state', searchForm.value.site_state);
+                        if (searchForm.value.text_content_search) params.append('text_content_search', searchForm.value.text_content_search);
+                        if (searchForm.value.ocr_content_search) params.append('ocr_content_search', searchForm.value.ocr_content_search);
+                        if (searchForm.value.has_id_card !== null) params.append('has_id_card', searchForm.value.has_id_card.toString());
+                        if (searchForm.value.has_phone !== null) params.append('has_phone', searchForm.value.has_phone.toString());
+                        if (searchForm.value.file_ext) params.append('file_ext', searchForm.value.file_ext);
+                        if (searchForm.value.manual_verified_sensitive !== null) params.append('manual_verified_sensitive', searchForm.value.manual_verified_sensitive.toString());
+                        
+                        const response = await fetch(`/api/attachments?${params}`);
+                        if (!response.ok) throw new Error(`API error: ${response.status}`);
+
+                        const data = await response.json();
+                        attachments.value = data.items;
+                        totalResults.value = data.total;
+                    } catch (error) {
+                        console.error('Error fetching attachments:', error);
+                        addNotification('Error loading attachments: ' + error.message, 'error');
+                    } finally {
+                        loading.value = false;
+                    }
+                };
+                
+                const fetchInitialData = async () => {
+                    await Promise.all([
+                        fetchStats(),
+                        fetchSites()
+                    ]);
+                    await fetchAttachments(); // Only fetch attachments if on search tab
+                };
+                
+                // UI functions
+                const setActiveTab = (tab) => {
+                    state.value.activeTab = tab;
+                    if (tab === 'search') {
+                        fetchAttachments();
+                    }
+                };
+
+                // Notification functions
+                const addNotification = (message, type = 'info') => {
+                    const id = Date.now() + Math.random();
+                    const notification = {
+                        id,
+                        message,
+                        type // 'info', 'success', 'warning', 'error'
+                    };
+                    state.value.notifications.push(notification);
+
+                    // Auto-remove notification after 5 seconds
+                    setTimeout(() => {
+                        removeNotification(id);
+                    }, 5000);
+                };
+
+                const removeNotification = (id) => {
+                    const index = state.value.notifications.findIndex(notification => notification.id === id);
+                    if (index > -1) {
+                        state.value.notifications.splice(index, 1);
+                    }
+                };
+
+                const refreshStats = async () => {
+                    await fetchStats();
+                };
+                
+                const searchSites = async () => {
+                    if (searchForm.value.site_name.length < 1) {
+                        siteSuggestions.value = [];
+                        return;
+                    }
+
+                    const query = searchForm.value.site_name.toLowerCase();
+                    siteSuggestions.value = cachedSites.value.filter(site =>
+                        site.name.toLowerCase().includes(query) ||
+                        (site.account && site.account.toLowerCase().includes(query)) ||
+                        (site.domain && site.domain.toLowerCase().includes(query))
+                    ).slice(0, 5);
+                };
+                
+                const searchSyncSites = async () => {
+                    if (syncForm.value.site_name.length < 1) {
+                        syncSiteSuggestions.value = [];
+                        return;
+                    }
+
+                    const query = syncForm.value.site_name.toLowerCase();
+                    syncSiteSuggestions.value = cachedSites.value.filter(site =>
+                        site.name.toLowerCase().includes(query) ||
+                        (site.account && site.account.toLowerCase().includes(query)) ||
+                        (site.domain && site.domain.toLowerCase().includes(query))
+                    ).slice(0, 5);
+                };
+
+                const searchSyncAttachmentSites = async () => {
+                    if (syncAttachmentsForm.value.site_name.length < 1) {
+                        syncAttachmentSiteSuggestions.value = [];
+                        return;
+                    }
+
+                    const query = syncAttachmentsForm.value.site_name.toLowerCase();
+                    syncAttachmentSiteSuggestions.value = cachedSites.value.filter(site =>
+                        site.name.toLowerCase().includes(query) ||
+                        (site.account && site.account.toLowerCase().includes(query)) ||
+                        (site.domain && site.domain.toLowerCase().includes(query))
+                    ).slice(0, 5);
+                };
+                
+                const searchDetectionSites = async () => {
+                    if (detectionForm.value.site_name.length < 1) {
+                        detectionSiteSuggestions.value = [];
+                        return;
+                    }
+
+                    const query = detectionForm.value.site_name.toLowerCase();
+                    detectionSiteSuggestions.value = cachedSites.value.filter(site =>
+                        site.name.toLowerCase().includes(query) ||
+                        (site.account && site.account.toLowerCase().includes(query)) ||
+                        (site.domain && site.domain.toLowerCase().includes(query))
+                    ).slice(0, 5);
+                };
+                
+                const selectSite = (site) => {
+                    searchForm.value.site_id = site.id;
+                    searchForm.value.site_name = `${site.name} (${site.account} - ${site.domain})`;
+                    // Set the owner for backend filtering
+                    searchForm.value.site_owner = site.owner;
+                    siteSuggestions.value = [];
+                };
+                
+                const selectSyncSite = (site) => {
+                    syncForm.value.site_owner = site.owner;
+                    syncForm.value.site_name = `${site.name} (${site.account} - ${site.domain})`;
+                    syncSiteSuggestions.value = [];
+                };
+
+                const selectSyncAttachmentSite = (site) => {
+                    syncAttachmentsForm.value.site_owner = site.owner;
+                    syncAttachmentsForm.value.site_name = `${site.name} (${site.account} - ${site.domain})`;
+                    syncAttachmentSiteSuggestions.value = [];
+                };
+                
+                const selectDetectionSite = (site) => {
+                    detectionForm.value.site_id = site.id;
+                    detectionForm.value.site_name = `${site.name} (${site.account} - ${site.domain})`;
+                    // Set the owner for backend filtering
+                    detectionForm.value.site_owner = site.owner;
+                    detectionSiteSuggestions.value = [];
+                };
+                
+                const getSiteName = (siteId) => {
+                    const site = sites.value.find(s => s.owner == siteId);
+                    return site ? site.name : 'Unknown Site';
+                };
+                
+                const performSearch = async () => {
+                    pagination.value.offset = 0; // Reset to first page
+                    await fetchAttachments();
+                };
+                
+                const resetSearch = () => {
+                    searchForm.value = {
+                        site_id: null,
+                        site_state: '',
+                        text_content_search: '',
+                        ocr_content_search: '',
+                        has_id_card: null,
+                        has_phone: null,
+                        site_name: '',
+                        file_ext: '',
+                        manual_verified_sensitive: null
+                    };
+                    siteSuggestions.value = [];
+                    pagination.value.offset = 0;
+                    fetchAttachments();
+                };
+                
+                const goToSearchWithSite = (siteId) => {
+                    // Find the site to get both ID and owner
+                    const site = sites.value.find(s => s.id == siteId);
+                    if (site) {
+                        searchForm.value.site_id = site.id;
+                        searchForm.value.site_owner = site.owner;
+                        searchForm.value.site_name = `${site.name} (${site.account} - ${site.domain})`;
+                    }
+                    setActiveTab('search');
+                    performSearch();
+                };
+                
+                const processAttachment = async (attachmentId) => {
+                    try {
+                        loading.value = true;
+                        const response = await fetch(`/api/process-attachment/${attachmentId}`, {
+                            method: 'POST'
+                        });
+                        
+                        if (response.ok) {
+                            addNotification('Attachment processed successfully', 'success');
+                            await fetchStats(); // Refresh stats
+                            if (activeTab.value === 'search') {
+                                await fetchAttachments(); // Refresh search results
+                            }
+                        } else {
+                            const error = await response.json();
+                            addNotification('Error processing attachment: ' + error.detail, 'error');
+                        }
+                    } catch (error) {
+                        console.error('Error processing attachment:', error);
+                        addNotification('Error processing attachment: ' + error.message, 'error');
+                    } finally {
+                        loading.value = false;
+                    }
+                };
+                
+                const processSite = async (siteId) => {
+                    // First find the site to get the owner
+                    const site = sites.value.find(s => s.id == siteId);
+                    if (!site) {
+                        addNotification('Site not found', 'error');
+                        return;
+                    }
+
+                    try {
+                        loading.value = true;
+                        const response = await fetch(`/api/process-site/${site.owner}`, {
+                            method: 'POST'
+                        });
+
+                        if (response.ok) {
+                            const result = await response.json();
+                            addNotification(result.message, 'success');
+                            await fetchStats(); // Refresh stats
+                            if (activeTab.value === 'search') {
+                                await fetchAttachments(); // Refresh search results
+                            }
+                        } else {
+                            const error = await response.json();
+                            addNotification('Error processing site: ' + error.detail, 'error');
+                        }
+                    } catch (error) {
+                        console.error('Error processing site:', error);
+                        addNotification('Error processing site: ' + error.message, 'error');
+                    } finally {
+                        loading.value = false;
+                    }
+                };
+                
+                const viewSiteAttachments = (siteId) => {
+                    // Find the site to get both ID and owner
+                    const site = sites.value.find(s => s.id == siteId);
+                    if (site) {
+                        searchForm.value.site_id = site.id;
+                        searchForm.value.site_owner = site.owner;
+                        searchForm.value.site_name = `${site.name} (${site.account} - ${site.domain})`;
+                    }
+                    setActiveTab('search');
+                    performSearch();
+                };
+                
+                const syncAll = async () => {
+                    try {
+                        syncInProgress.value = true;
+                        const response = await fetch('/api/sync', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({})
+                        });
+
+                        const result = await response.json();
+
+                        if (response.ok) {
+                            syncStatus.value = { success: true, message: result.message };
+                            addNotification(result.message, 'success');
+                            await fetchStats(); // Refresh stats after sync
+                            await fetchSites(); // Refresh sites
+                        } else {
+                            syncStatus.value = { success: false, message: result.detail || 'Sync failed' };
+                            addNotification(result.detail || 'Sync failed', 'error');
+                        }
+                    } catch (error) {
+                        console.error('Error during sync:', error);
+                        syncStatus.value = { success: false, message: 'Error during sync: ' + error.message };
+                        addNotification('Error during sync: ' + error.message, 'error');
+                    } finally {
+                        syncInProgress.value = false;
+                    }
+                };
+                
+                const syncSites = async () => {
+                    try {
+                        syncInProgress.value = true;
+                        const response = await fetch('/api/sync-sites', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({})
+                        });
+
+                        const result = await response.json();
+
+                        if (response.ok) {
+                            syncStatus.value = { success: true, message: result.message };
+                            addNotification(result.message, 'success');
+                            await fetchStats(); // Refresh stats after sync
+                            await fetchSites(); // Refresh sites
+                        } else {
+                            syncStatus.value = { success: false, message: result.detail || 'Sync sites failed' };
+                            addNotification(result.detail || 'Sync sites failed', 'error');
+                        }
+                    } catch (error) {
+                        console.error('Error during site sync:', error);
+                        syncStatus.value = { success: false, message: 'Error during site sync: ' + error.message };
+                        addNotification('Error during site sync: ' + error.message, 'error');
+                    } finally {
+                        syncInProgress.value = false;
+                    }
+                };
+
+                const syncAttachments = async () => {
+                    try {
+                        syncInProgress.value = true;
+                        const response = await fetch('/api/sync-attachments', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({ site_owner: syncAttachmentsForm.value.site_owner || undefined })
+                        });
+
+                        const result = await response.json();
+
+                        if (response.ok) {
+                            syncStatus.value = { success: true, message: result.message };
+                            addNotification(result.message, 'success');
+                            await fetchStats(); // Refresh stats after sync
+                            await fetchSites(); // Refresh sites
+                        } else {
+                            syncStatus.value = { success: false, message: result.detail || 'Sync attachments failed' };
+                            addNotification(result.detail || 'Sync attachments failed', 'error');
+                        }
+                    } catch (error) {
+                        console.error('Error during attachment sync:', error);
+                        syncStatus.value = { success: false, message: 'Error during attachment sync: ' + error.message };
+                        addNotification('Error during attachment sync: ' + error.message, 'error');
+                    } finally {
+                        syncInProgress.value = false;
+                    }
+                };
+
+                const syncSite = async () => {
+                    if (!syncForm.value.site_owner) {
+                        addNotification("Please select a site to sync", 'warning');
+                        return;
+                    }
+
+                    try {
+                        syncInProgress.value = true;
+                        const response = await fetch('/api/sync', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({ site_owner: syncForm.value.site_owner })
+                        });
+
+                        const result = await response.json();
+
+                        if (response.ok) {
+                            syncStatus.value = { success: true, message: result.message };
+                            addNotification(result.message, 'success');
+                            await fetchStats(); // Refresh stats after sync
+                            await fetchSites(); // Refresh sites
+                        } else {
+                            syncStatus.value = { success: false, message: result.detail || 'Sync failed' };
+                            addNotification(result.detail || 'Sync failed', 'error');
+                        }
+                    } catch (error) {
+                        console.error('Error during sync:', error);
+                        syncStatus.value = { success: false, message: 'Error during sync: ' + error.message };
+                        addNotification('Error during sync: ' + error.message, 'error');
+                    } finally {
+                        syncInProgress.value = false;
+                    }
+                };
+                
+                const prevPage = () => {
+                    if (pagination.value.offset > 0) {
+                        pagination.value.offset -= pagination.value.limit;
+                        fetchAttachments();
+                    }
+                };
+                
+                const nextPage = () => {
+                    pagination.value.offset += pagination.value.limit;
+                    fetchAttachments();
+                };
+                
+                const goToPage = (pageNum) => {
+                    pagination.value.offset = (pageNum - 1) * pagination.value.limit;
+                    fetchAttachments();
+                };
+                
+                const getCurrentPage = () => {
+                    return Math.floor(pagination.value.offset / pagination.value.limit) + 1;
+                };
+                
+                const getPageNumbers = () => {
+                    const totalPages = Math.ceil(totalResults.value / pagination.value.limit);
+                    const currentPage = getCurrentPage();
+                    
+                    // Show a maximum of 5 page numbers centered around current page
+                    const pages = [];
+                    const start = Math.max(1, currentPage - 2);
+                    const end = Math.min(totalPages, currentPage + 2);
+                    
+                    for (let i = start; i <= end; i++) {
+                        pages.push(i);
+                    }
+                    
+                    return pages;
+                };
+                
+                // Formatters
+                const formatDate = (dateString) => {
+                    if (!dateString) return 'N/A';
+                    const date = new Date(dateString);
+                    return date.toLocaleDateString();
+                };
+                
+                const formatNumber = (num) => {
+                    if (typeof num === 'number') {
+                        return num.toLocaleString();
+                    }
+                    return num || 0;
+                };
+                
+                const truncateText = (text, maxLength) => {
+                    if (!text) return '';
+                    return text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
+                };
+                
+                // Chart functions
+                const renderCharts = () => {
+                    // Destroy existing charts if they exist
+                    if (attachmentsChart) {
+                        attachmentsChart.destroy();
+                    }
+                    if (distributionChart) {
+                        distributionChart.destroy();
+                    }
+                    
+                    // Get context for charts
+                    const attachmentsCtx = document.getElementById('attachmentsChart')?.getContext('2d');
+                    const distributionCtx = document.getElementById('distributionChart')?.getContext('2d');
+                    
+                    if (attachmentsCtx && stats.value.sites_stats.length > 0) {
+                        // Prepare data for attachments chart
+                        const siteNames = stats.value.sites_stats.map(site => site.site_name).slice(0, 10); // Limit to 10 sites
+                        const attachmentCounts = stats.value.sites_stats.map(site => site.total_attachments).slice(0, 10);
+                        
+                        attachmentsChart = new Chart(attachmentsCtx, {
+                            type: 'bar',
+                            data: {
+                                labels: siteNames,
+                                datasets: [{
+                                    label: 'Total Attachments',
+                                    data: attachmentCounts,
+                                    backgroundColor: 'rgba(79, 70, 229, 0.7)',
+                                    borderColor: 'rgba(79, 70, 229, 1)',
+                                    borderWidth: 1
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                plugins: {
+                                    legend: {
+                                        position: 'top',
+                                    },
+                                    title: {
+                                        display: true,
+                                        text: 'Attachments by Site'
+                                    }
+                                },
+                                scales: {
+                                    y: {
+                                        beginAtZero: true,
+                                        title: {
+                                            display: true,
+                                            text: 'Number of Attachments'
+                                        }
+                                    }
+                                }
+                            }
+                        });
+                    }
+                    
+                    if (distributionCtx) {
+                        // Prepare data for distribution chart
+                        const idCardCount = stats.value.attachments_with_id_card;
+                        const phoneCount = stats.value.attachments_with_phone;
+                        const safeCount = stats.value.total_attachments - idCardCount - phoneCount;
+                        
+                        distributionChart = new Chart(distributionCtx, {
+                            type: 'doughnut',
+                            data: {
+                                labels: ['Attachments with ID Card', 'Attachments with Phone', 'Safe Attachments'],
+                                datasets: [{
+                                    data: [idCardCount, phoneCount, safeCount],
+                                    backgroundColor: [
+                                        'rgba(239, 68, 68, 0.7)',    // Red for ID cards
+                                        'rgba(234, 179, 8, 0.7)',    // Yellow for phones
+                                        'rgba(16, 185, 129, 0.7)'    // Green for safe
+                                    ],
+                                    borderColor: [
+                                        'rgba(239, 68, 68, 1)',
+                                        'rgba(234, 179, 8, 1)',
+                                        'rgba(16, 185, 129, 1)'
+                                    ],
+                                    borderWidth: 1
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                plugins: {
+                                    legend: {
+                                        position: 'bottom'
+                                    },
+                                    title: {
+                                        display: true,
+                                        text: 'Sensitive Information Distribution'
+                                    }
+                                }
+                            }
+                        });
+                    }
+                };
+                
+                const showAttachmentDetails = (attachment) => {
+                    selectedAttachment.value = attachment;
+                    showDetailsModal.value = true;
+                };
+                
+                const previewAttachment = (attachment) => {
+                    selectedAttachment.value = attachment;
+                    showPreviewModal.value = true;
+                };
+                
+                const performDetection = async () => {
+                    if (!detectionForm.value.site_owner) {
+                        addNotification("Please select a site", 'warning');
+                        return;
+                    }
+
+                    // Generate a unique WebSocket ID
+                    const wsId = 'ws_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
+
+                    try {
+                        loading.value = true;
+
+                        // Show progress modal
+                        showProgressModal.value = true;
+                        showDetectionModal.value = false;
+
+                        // Initialize progress
+                        progress.value = {
+                            current: 0,
+                            total: 0,
+                            message: 'Connecting to server...',
+                            status: 'processing'
+                        };
+
+                        // Create WebSocket connection for progress updates
+                        const wsUrl = `ws://${window.location.host}/ws/${wsId}`;
+                        const ws = new WebSocket(wsUrl);
+
+                        // Handle WebSocket messages
+                        ws.onmessage = function(event) {
+                            const data = JSON.parse(event.data);
+                            progress.value = {
+                                current: data.current,
+                                total: data.total,
+                                message: data.message,
+                                status: data.status
+                            };
+
+                            // Close the modal when detection is completed
+                            if (data.status === 'completed' || data.status === 'error') {
+                                setTimeout(() => {
+                                    showProgressModal.value = false;
+                                    // Refresh stats after detection
+                                    fetchStats();
+                                    if (activeTab.value === 'search') {
+                                        fetchAttachments(); // Refresh search results if on search tab
+                                    }
+                                    progress.value = {
+                                        current: 0,
+                                        total: 0,
+                                        message: '',
+                                        status: ''
+                                    };
+                                }, 2000); // Wait 2 seconds to show completion message
+                            }
+                        };
+
+                        // Handle WebSocket errors
+                        ws.onerror = function(error) {
+                            console.error('WebSocket error:', error);
+                            progress.value.status = 'error';
+                            progress.value.message = 'Connection error occurred';
+                        };
+
+                        // Handle WebSocket close
+                        ws.onclose = function() {
+                            console.log('WebSocket connection closed');
+                        };
+
+                        // Make the API call to start detection
+                        const response = await fetch(`/api/detect-site/${detectionForm.value.site_owner}?detection_type=${detectionForm.value.type}&ws_id=${wsId}`, {
+                            method: 'POST'
+                        });
+
+                        if (!response.ok) {
+                            const error = await response.json();
+                            addNotification('Error during detection: ' + error.detail, 'error');
+                            progress.value.status = 'error';
+                            progress.value.message = 'Error during detection: ' + error.detail;
+                        }
+                    } catch (error) {
+                        console.error('Error during detection:', error);
+                        addNotification('Error during detection: ' + error.message, 'error');
+                        progress.value.status = 'error';
+                        progress.value.message = 'Error during detection: ' + error.message;
+                    } finally {
+                        loading.value = false;
+                    }
+                };
+
+                const getPreviewUrl = (urlPath) => {
+                    if (!urlPath) return '';
+
+                    // Check if the URL already starts with the prefix
+                    if (urlPath.startsWith('http://www.ynu.edu.cn/__local')) {
+                        return urlPath;
+                    }
+
+                    // If it's a relative path, prepend the prefix
+                    if (urlPath.startsWith('/')) {
+                        return 'http://www.ynu.edu.cn/__local' + urlPath;
+                    }
+
+                    // If it's already an absolute URL, return as is
+                    if (urlPath.startsWith('http')) {
+                        return urlPath;
+                    }
+
+                    // Otherwise, prepend the prefix
+                    return 'http://www.ynu.edu.cn/__local/' + urlPath;
+                };
+
+                const cancelDetection = () => {
+                    // Set progress status to error to disable the cancel button
+                    progress.value.status = 'error';
+                    // Close the modal after a short delay
+                    setTimeout(() => {
+                        showProgressModal.value = false;
+                        progress.value = {
+                            current: 0,
+                            total: 0,
+                            message: '',
+                            status: ''
+                        };
+                    }, 1000);
+                };
+
+                return {
+                    // State
+                    activeTab,
+                    stats,
+                    sites,
+                    attachments,
+                    siteSuggestions,
+                    syncSiteSuggestions,
+                    syncAttachmentSiteSuggestions,
+                    detectionSiteSuggestions,
+                    selectedAttachment,
+                    totalResults,
+                    loading,
+                    syncInProgress,
+                    showAdvancedSearch,
+                    showDetailsModal,
+                    showPreviewModal,
+                    showDetectionModal,
+                    showProgressModal,
+                    progress,
+                    syncStatus,
+                    cachedSites,
+                    searchForm,
+                    syncForm,
+                    syncAttachmentsForm,
+                    detectionForm,
+                    pagination,
+                    // Computed
+                    isPreviewableImage,
+                    isPreviewablePdf,
+                    isPreviewableText,
+                    previewUrl,
+                    progressPercentage,
+                    circumference,
+                    strokeDashoffset,
+                    // Methods
+                    setActiveTab,
+                    refreshStats,
+                    searchSites,
+                    searchSyncSites,
+                    searchDetectionSites,
+                    selectSite,
+                    selectSyncSite,
+                    selectDetectionSite,
+                    getSiteName,
+                    performSearch,
+                    resetSearch,
+                    goToSearchWithSite,
+                    processAttachment,
+                    processSite,
+                    viewSiteAttachments,
+                    syncAll,
+                    syncSite,
+                    prevPage,
+                    nextPage,
+                    goToPage,
+                    getCurrentPage,
+                    getPageNumbers,
+                    formatDate,
+                    formatNumber,
+                    truncateText,
+                    showAttachmentDetails,
+                    previewAttachment,
+                    performDetection,
+                    getPreviewUrl,
+                    cancelDetection,
+                    renderCharts,
+                    addNotification,
+                    removeNotification,
+                    syncSites,
+                    syncAttachments,
+                    searchSyncAttachmentSites,
+                    selectSyncAttachmentSite
+                };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
