@@ -278,10 +278,10 @@ def extract_zip_content(zip_path, extract_to):
     """Extract content from zip/rar files"""
     try:
         os.makedirs(extract_to, exist_ok=True)
-        if zip_path.endswith('.zip'):
+        if zip_path.lower().endswith('.zip'):
             with zipfile.ZipFile(zip_path, 'r') as zip_ref:
                 zip_ref.extractall(extract_to)
-        elif zip_path.endswith('.rar'):
+        elif zip_path.lower().endswith('.rar'):
             with rarfile.RarFile(zip_path, 'r') as rar_ref:
                 rar_ref.extractall(extract_to)
     except Exception as e:

@@ -114,6 +114,7 @@ def process_attachment_file(attachment: Attachment, db: Session, base_url: str =
     if not extracted_ext:
         # If no extension in URL, fall back to the stored file_ext
         extracted_ext = attachment.file_ext.lower() if attachment.file_ext else ""
+    # else: os.path.splitext() already returns the extension with leading dot
 
     # Update the attachment's file_ext field to the extracted extension if different
     if attachment.file_ext != extracted_ext:
@@ -131,7 +132,7 @@ def process_attachment_file(attachment: Attachment, db: Session, base_url: str =
             return
 
     # If the file is an archive, extract it and process the contents
-    if extracted_ext in ['zip', 'rar']:
+    if extracted_ext in ['.zip', '.rar']:
         # Create a temporary directory for extracted files
         extract_dir = cached_path + "_extracted"
 
@@ -148,12 +149,12 @@ def process_attachment_file(attachment: Attachment, db: Session, base_url: str =
                 file_path = os.path.join(root, file)
                 _, file_ext = os.path.splitext(file)
                 if file_ext:
-                    file_ext = file_ext[1:].lower()  # Remove leading dot and lowercase
+                    file_ext = file_ext.lower()  # Convert to lowercase, keeping the dot
                 # Extract content from each file in the archive
                 file_text = extract_text_from_file(file_path)
                 text_content += file_text + "\n"
 
-                if file_ext in ['jpg', 'jpeg', 'png', 'bmp', 'gif', 'tiff', 'pdf']:
+                if file_ext in ['.jpg', '.jpeg', '.png', '.bmp', '.gif', '.tiff', '.pdf']:
                     file_ocr = extract_text_from_file(file_path)
                     ocr_content += file_ocr + "\n"
     else:
@@ -162,7 +163,7 @@ def process_attachment_file(attachment: Attachment, db: Session, base_url: str =
 
         # Determine if we need OCR content (for images and image-based PDFs)
         ocr_content = ""
-        if extracted_ext in ['jpg', 'jpeg', 'png', 'bmp', 'gif', 'tiff', 'pdf']:
+        if extracted_ext in ['.jpg', '.jpeg', '.png', '.bmp', '.gif', '.tiff', '.pdf']:
             ocr_content = extract_text_from_file(cached_path)  # This will use OCR for images
 
     # Process based on detection type
