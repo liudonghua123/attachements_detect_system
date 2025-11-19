@@ -108,8 +108,7 @@ class SiteBase(BaseModel):
     alias_domains: Optional[str] = None
     create_date: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 class SiteResponse(SiteBase):
     id: int
@@ -123,8 +122,7 @@ class AttachmentBase(BaseModel):
     file_ext: str
     create_date: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 class AttachmentResponse(AttachmentBase):
     id: int
@@ -138,6 +136,8 @@ class AttachmentResponse(AttachmentBase):
     create_date: Optional[datetime] = None
     processed_datetime: Optional[datetime] = None
     ocr_score: Optional[float] = None
+
+    model_config = {"from_attributes": True}
 
 
 class SyncRequest(BaseModel):
@@ -154,8 +154,7 @@ class SiteStats(BaseModel):
     attachments_with_id_card: int
     attachments_with_phone: int
 
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 
 class StatsResponse(BaseModel):
@@ -166,8 +165,7 @@ class StatsResponse(BaseModel):
     sites_stats: List[SiteStats]
     sync_sites: Optional[int] = 0
 
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 
 class AttachmentQuery(BaseModel):
@@ -229,7 +227,7 @@ def get_attachments(
     skip: int = 0,
     limit: int = 100,
     sort_by: Optional[str] = Query(None),  # Field to sort by
-    sort_order: Optional[str] = Query("asc", regex="^(asc|desc)$"),  # Sort direction
+    sort_order: Optional[str] = Query("asc", pattern="^(asc|desc)$"),  # Sort direction
     db: Session = Depends(get_db)
 ):
     query = db.query(Attachment)
