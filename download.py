@@ -111,10 +111,7 @@ def process_attachment_file(attachment: Attachment, db: Session, base_url: str =
     from urllib.parse import urlparse
     parsed_url = urlparse(full_url)
     _, extracted_ext = os.path.splitext(parsed_url.path)
-    if extracted_ext:
-        # Remove the leading dot for consistency
-        extracted_ext = extracted_ext[1:].lower()
-    else:
+    if not extracted_ext:
         # If no extension in URL, fall back to the stored file_ext
         extracted_ext = attachment.file_ext.lower() if attachment.file_ext else ""
 
