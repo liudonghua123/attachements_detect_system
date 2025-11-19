@@ -10,6 +10,8 @@ import tempfile
 from config import settings
 import requests
 import json
+import xlrd
+from pptx import Presentation
 
 
 # OCR engine configuration
@@ -91,6 +93,59 @@ def extract_text_from_xlsx(xlsx_path):
         return ""
 
 
+def extract_text_from_xls(xls_path):
+    """Extract text from XLS file using xlrd"""
+    try:
+        workbook = xlrd.open_workbook(xls_path)
+        text = ""
+        for sheet in workbook.sheets():
+            for row_idx in range(sheet.nrows):
+                row_values = []
+                for col_idx in range(sheet.ncols):
+                    cell_value = sheet.cell_value(row_idx, col_idx)
+                    if cell_value is not None:
+                        row_values.append(str(cell_value))
+                text += " ".join(row_values) + "\n"
+        return text
+    except Exception as e:
+        print(f"Error extracting text from XLS {xls_path}: {str(e)}")
+        return ""
+
+
+def extract_text_from_doc(doc_path):
+    """Extract text from DOC file using textract"""
+    try:
+        import textract
+        text = textract.process(doc_path).decode('utf-8')
+        return text
+    except ImportError:
+        print("textract not available for .doc files")
+        # Fallback: try to handle as .docx (sometimes works for some .doc files)
+        try:
+            import docx2txt
+            text = docx2txt.process(doc_path)
+            return text
+        except ImportError:
+            print("docx2txt also not available for .doc files")
+        except Exception as e:
+            print(f"Error using docx2txt for .doc file {doc_path}: {str(e)}")
+
+        # If all else fails
+        print(f"Could not extract text from DOC file {doc_path}")
+        return ""
+    except Exception as e:
+        print(f"Error extracting text from DOC {doc_path} using textract: {str(e)}")
+        # Fallback to other methods if textract fails
+        try:
+            import docx2txt
+            text = docx2txt.process(doc_path)
+            return text
+        except:
+            pass
+
+        return ""
+
+
 def extract_text_from_txt(txt_path):
     """Extract text from TXT file"""
     try:
@@ -98,6 +153,21 @@ def extract_text_from_txt(txt_path):
             return file.read()
     except Exception as e:
         print(f"Error extracting text from TXT {txt_path}: {str(e)}")
+        return ""
+
+
+def extract_text_from_ppt(ppt_path):
+    """Extract text from PPT/PPTX file using python-pptx"""
+    try:
+        presentation = Presentation(ppt_path)
+        text = ""
+        for slide_number, slide in enumerate(presentation.slides):
+            for shape in slide.shapes:
+                if hasattr(shape, "text"):
+                    text += shape.text + "\n"
+        return text
+    except Exception as e:
+        print(f"Error extracting text from PPT/PPTX {ppt_path}: {str(e)}")
         return ""
 
 
@@ -186,10 +256,16 @@ def extract_text_from_file(file_path):
             ocr_text = extract_ocr_from_pdf(file_path)
             return max(text, ocr_text, key=len)  # Return the longer text
         return text
-    elif ext in ['.docx']:
+    elif ext == '.docx':
         return extract_text_from_docx(file_path)
-    elif ext in ['.xlsx', '.xls']:
+    elif ext == '.doc':
+        return extract_text_from_doc(file_path)  # Use the new function for .doc files
+    elif ext in ['.ppt', '.pptx']:
+        return extract_text_from_ppt(file_path)  # Use the new function for .ppt/.pptx files
+    elif ext == '.xlsx':
         return extract_text_from_xlsx(file_path)
+    elif ext == '.xls':
+        return extract_text_from_xls(file_path)  # Use the new function for .xls files
     elif ext in ['.txt']:
         return extract_text_from_txt(file_path)
     elif ext in ['.jpg', '.jpeg', '.png', '.bmp', '.gif', '.tiff']:

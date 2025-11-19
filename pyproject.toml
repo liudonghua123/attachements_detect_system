@@ -24,4 +24,8 @@ dependencies = [
     "requests==2.31.0",
     "sqlalchemy==2.0.44",
     "uvicorn[standard]==0.24.0",
+    "xlrd>=1.2.0,<2.0.0",
+    "python-pptx==0.6.23",
+    "pymupdf>=1.23.8",
+    "textract==1.6.5",
 ]

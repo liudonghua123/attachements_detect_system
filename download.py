@@ -6,7 +6,7 @@ from config import settings
 import hashlib
 from models import Attachment
 from sqlalchemy.orm import Session
-from utils import extract_text_from_file, contains_id_card, contains_phone, detect_sensitive_info_ai
+from utils import extract_text_from_file, contains_id_card, contains_phone, detect_sensitive_info_ai, extract_zip_content
 import zipfile
 import rarfile
 
@@ -74,23 +74,23 @@ def update_progress(ws_id: str, current: int, total: int, message: str):
             "message": message,
             "status": "processing" if current < total else "completed"
         }
-        await manager.send_progress(ws_id, progress_data)
+        try:
+            # Check if connection exists before sending
+            if ws_id in manager.active_connections:
+                await manager.send_progress(ws_id, progress_data)
+            else:
+                print(f"WebSocket connection {ws_id} not found, skipping progress update")
+        except Exception as e:
+            print(f"Error sending WebSocket progress: {e}")
 
-    # Run the async function in the current event loop
+    # Get the current event loop and schedule the task
     try:
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            # Create a task if the loop is running (which it should be in FastAPI)
-            asyncio.create_task(send_update())
-        else:
-            # Run if the loop is not running
-            loop.run_until_complete(send_update())
+        loop = asyncio.get_running_loop()
+        # Schedule the task in the running event loop
+        loop.create_task(send_update())
     except RuntimeError:
-        # Handle case where no event loop is running
-        new_loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(new_loop)
-        new_loop.run_until_complete(send_update())
-        new_loop.close()
+        # No running event loop, create one
+        asyncio.run(send_update())
 
 
 def process_attachment_file(attachment: Attachment, db: Session, base_url: str = "", detection_type="normal", progress_callback=None):
@@ -107,6 +107,22 @@ def process_attachment_file(attachment: Attachment, db: Session, base_url: str =
         print(f"Invalid URL for attachment {attachment.id}: {full_url}")
         return
 
+    # Extract file extension from URL path for more accurate detection
+    from urllib.parse import urlparse
+    parsed_url = urlparse(full_url)
+    _, extracted_ext = os.path.splitext(parsed_url.path)
+    if extracted_ext:
+        # Remove the leading dot for consistency
+        extracted_ext = extracted_ext[1:].lower()
+    else:
+        # If no extension in URL, fall back to the stored file_ext
+        extracted_ext = attachment.file_ext.lower() if attachment.file_ext else ""
+
+    # Update the attachment's file_ext field to the extracted extension if different
+    if attachment.file_ext != extracted_ext:
+        attachment.file_ext = extracted_ext
+        db.commit()  # Commit the change to the database
+
     # Get cached file path
     cached_path = get_cached_file_path(full_url)
 
@@ -118,7 +134,7 @@ def process_attachment_file(attachment: Attachment, db: Session, base_url: str =
             return
 
     # If the file is an archive, extract it and process the contents
-    if attachment.file_ext.lower() in ['.zip', '.rar']:
+    if extracted_ext in ['zip', 'rar']:
         # Create a temporary directory for extracted files
         extract_dir = cached_path + "_extracted"
 
@@ -133,11 +149,14 @@ def process_attachment_file(attachment: Attachment, db: Session, base_url: str =
         for root, dirs, files in os.walk(extract_dir):
             for file in files:
                 file_path = os.path.join(root, file)
+                _, file_ext = os.path.splitext(file)
+                if file_ext:
+                    file_ext = file_ext[1:].lower()  # Remove leading dot and lowercase
                 # Extract content from each file in the archive
                 file_text = extract_text_from_file(file_path)
                 text_content += file_text + "\n"
 
-                if file.lower().endswith(('.jpg', '.jpeg', '.png', '.bmp', '.gif', '.tiff', '.pdf')):
+                if file_ext in ['jpg', 'jpeg', 'png', 'bmp', 'gif', 'tiff', 'pdf']:
                     file_ocr = extract_text_from_file(file_path)
                     ocr_content += file_ocr + "\n"
     else:
@@ -146,7 +165,7 @@ def process_attachment_file(attachment: Attachment, db: Session, base_url: str =
 
         # Determine if we need OCR content (for images and image-based PDFs)
         ocr_content = ""
-        if attachment.file_ext.lower() in ['.jpg', '.jpeg', '.png', '.bmp', '.gif', '.tiff', '.pdf']:
+        if extracted_ext in ['jpg', 'jpeg', 'png', 'bmp', 'gif', 'tiff', 'pdf']:
             ocr_content = extract_text_from_file(cached_path)  # This will use OCR for images
 
     # Process based on detection type
@@ -181,7 +200,7 @@ def process_attachment_file(attachment: Attachment, db: Session, base_url: str =
         attachment.verification_notes = f"Auto-detected: ID card={has_id_card}, Phone={has_phone}"
 
     db.commit()
-    print(f"Processed attachment {attachment.id}: ID card={has_id_card}, Phone={has_phone}, Manual verification required={has_id_card or has_phone}")
+    print(f"Processed attachment {attachment.id}: ID card={has_id_card}, Phone={has_phone}, Manual verification required={has_id_card or has_phone}, File extension: {extracted_ext}")
 
     # Call progress callback if provided
     if progress_callback:
@@ -247,3 +266,56 @@ def process_site_attachments_with_progress(site_owner: str, db: Session, detecti
         "processed_count": processed_count,
         "sensitive_count": sensitive_count
     }
+
+
+def download_site_attachments_simple(site_owner: str, db: Session):
+    """
+    Download all attachments for a site without progress tracking
+    """
+    # Get all attachments for the site
+    attachments = db.query(Attachment).filter(Attachment.site_id == site_owner).all()
+
+    total_attachments = len(attachments)
+    downloaded_count = 0
+
+    for i, attachment in enumerate(attachments, 1):
+        try:
+            # Construct full URL for the attachment
+            if attachment.url_path.startswith(('http://', 'https://')):
+                full_url = attachment.url_path
+            else:
+                # Use the default base URL
+                effective_base_url = settings.ATTACHMENT_DEFAULT_BASE_URL
+                full_url = effective_base_url.rstrip('/') + attachment.url_path if effective_base_url else attachment.url_path
+
+            if not full_url or full_url == attachment.url_path and not full_url.startswith(('http://', 'https://')):
+                print(f"Invalid URL for attachment {attachment.id}: {full_url}")
+                continue
+
+            # Get cached file path
+            cached_path = get_cached_file_path(full_url)
+
+            # Download file if not already cached
+            if not os.path.exists(cached_path):
+                print(f"Downloading {full_url} to {cached_path}")
+                if download_file(full_url, cached_path):
+                    downloaded_count += 1
+                else:
+                    print(f"Failed to download {full_url}")
+            else:
+                # File already exists in cache, count as downloaded
+                downloaded_count += 1
+
+        except Exception as e:
+            print(f"Error downloading attachment {attachment.id}: {str(e)}")
+            continue
+
+    return {
+        "message": f"Download completed. {downloaded_count} of {total_attachments} attachments downloaded for site {site_owner}",
+        "downloaded_count": downloaded_count,
+        "total_count": total_attachments
+    }
+
+
+
+

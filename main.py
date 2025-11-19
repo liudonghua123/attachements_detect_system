@@ -54,10 +54,40 @@ app.add_middleware(
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
+import asyncio
+import threading
+from collections import defaultdict
+
+# Global state for pending operations
+pending_operations = {}
+operation_lock = threading.Lock()
+
 @app.websocket("/ws/{ws_id}")
 async def websocket_endpoint(websocket: WebSocket, ws_id: str):
     await manager.connect(ws_id, websocket)
     try:
+        # Check if there's a pending operation for this ws_id
+        with operation_lock:
+            if ws_id in pending_operations:
+                # Get the operation details and execute it
+                operation = pending_operations[ws_id]
+                del pending_operations[ws_id]
+
+                # Execute the operation in a separate thread/task
+                # We need to make sure this runs after the WebSocket is connected
+                if operation['type'] == 'detect':
+                    site_owner = operation['params']['site_owner']
+                    detection_type = operation['params']['detection_type']
+                    # Run the detection operation
+                    from download import process_site_attachments_with_progress
+                    from models import SessionLocal
+                    db = SessionLocal()
+                    try:
+                        process_site_attachments_with_progress(site_owner, db, detection_type, ws_id)
+                    finally:
+                        db.close()
+
+        # Keep the WebSocket connection alive to receive messages
         while True:
             # Keep the connection alive
             data = await websocket.receive_text()
@@ -350,9 +380,17 @@ def detect_site_attachments(site_owner: str, detection_type: str = "normal", ws_
 
     # Check if ws_id is provided for progress updates
     if ws_id:
-        # Use the progress tracking version
-        from download import process_site_attachments_with_progress
-        return process_site_attachments_with_progress(site_owner, db, detection_type, ws_id)
+        # Register the operation as pending to be executed when WebSocket connects
+        with operation_lock:
+            pending_operations[ws_id] = {
+                'type': 'detect',
+                'params': {
+                    'site_owner': site_owner,
+                    'detection_type': detection_type
+                }
+            }
+        # Return to allow client to establish WebSocket connection
+        return {"message": "Detection will start when WebSocket connection is established", "site_owner": site_owner, "ws_id": ws_id}
     else:
         # Use the original detection without progress tracking
         attachments = db.query(Attachment).filter(Attachment.site_id == site_owner).all()
@@ -381,6 +419,19 @@ def detect_site_attachments(site_owner: str, detection_type: str = "normal", ws_
             "processed_count": processed_count,
             "sensitive_count": sensitive_count
         }
+
+
+@app.post("/api/download-site/{site_owner}")
+def download_site_attachments(site_owner: str, db: Session = Depends(get_db)):
+    """
+    Download all attachments for a site (without progress tracking).
+    This is a synchronous operation that returns results when complete.
+    """
+    from download import download_site_attachments_simple
+    return download_site_attachments_simple(site_owner, db)
+
+
+
 
 
 @app.get("/api/stats", response_model=StatsResponse)

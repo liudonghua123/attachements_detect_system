@@ -312,23 +312,30 @@
                                             <div v-else class="text-sm text-gray-500">0</div>
                                         </td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm space-x-2">
-                                            <button 
-                                                @click="processSite(site.site_id)" 
-                                                class="text-blue-600 hover:text-blue-900 hover:bg-blue-50 px-2 py-1 rounded transition" 
+                                            <button
+                                                @click="processSite(site.site_id)"
+                                                class="text-blue-600 hover:text-blue-900 hover:bg-blue-50 px-2 py-1 rounded transition"
                                                 title="Process Attachments"
                                             >
                                                 <i class="fas fa-cogs"></i>
                                             </button>
-                                            <button 
-                                                @click="viewSiteAttachments(site.site_id)" 
-                                                class="text-green-600 hover:text-green-900 hover:bg-green-50 px-2 py-1 rounded transition" 
+                                            <button
+                                                @click="downloadSiteAttachments(site.site_id)"
+                                                class="text-blue-600 hover:text-blue-900 hover:bg-blue-50 px-2 py-1 rounded transition"
+                                                title="Download Attachments"
+                                            >
+                                                <i class="fas fa-download"></i>
+                                            </button>
+                                            <button
+                                                @click="viewSiteAttachments(site.site_id)"
+                                                class="text-green-600 hover:text-green-900 hover:bg-green-50 px-2 py-1 rounded transition"
                                                 title="View Attachments"
                                             >
                                                 <i class="fas fa-eye"></i>
                                             </button>
-                                            <button 
-                                                @click="goToSearchWithSite(site.site_id)" 
-                                                class="text-purple-600 hover:text-purple-900 hover:bg-purple-50 px-2 py-1 rounded transition" 
+                                            <button
+                                                @click="goToSearchWithSite(site.site_id)"
+                                                class="text-purple-600 hover:text-purple-900 hover:bg-purple-50 px-2 py-1 rounded transition"
                                                 title="Search Attachments"
                                             >
                                                 <i class="fas fa-search"></i>
@@ -1176,7 +1183,7 @@
                 
                 const isPreviewableText = computed(() => {
                     const ext = selectedAttachment.value.file_ext ? selectedAttachment.value.file_ext.toLowerCase() : '';
-                    return ['.txt', '.doc', '.docx', '.xls', '.xlsx'].includes(ext);
+                    return ['.txt', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx'].includes(ext);
                 });
 
                 const previewUrl = computed(() => {
@@ -1504,6 +1511,35 @@
                     }
                 };
                 
+                const downloadSiteAttachments = async (siteId) => {
+                    // Find the site to get the owner
+                    const site = sites.value.find(s => s.id == siteId);
+                    if (!site) {
+                        addNotification('Site not found', 'error');
+                        return;
+                    }
+
+                    try {
+                        loading.value = true;
+                        const response = await fetch(`/api/download-site/${site.owner}`, {
+                            method: 'POST'
+                        });
+
+                        if (response.ok) {
+                            const result = await response.json();
+                            addNotification(result.message, 'success');
+                        } else {
+                            const error = await response.json();
+                            addNotification('Error downloading site: ' + error.detail, 'error');
+                        }
+                    } catch (error) {
+                        console.error('Error downloading site:', error);
+                        addNotification('Error downloading site: ' + error.message, 'error');
+                    } finally {
+                        loading.value = false;
+                    }
+                };
+
                 const viewSiteAttachments = (siteId) => {
                     // Find the site to get both ID and owner
                     const site = sites.value.find(s => s.id == siteId);
@@ -1837,46 +1873,55 @@
                         const wsUrl = `ws://${window.location.host}/ws/${wsId}`;
                         const ws = new WebSocket(wsUrl);
 
-                        // Handle WebSocket messages
-                        ws.onmessage = function(event) {
-                            const data = JSON.parse(event.data);
-                            progress.value = {
-                                current: data.current,
-                                total: data.total,
-                                message: data.message,
-                                status: data.status
+                        // Promise to track when WebSocket is ready
+                        const wsReady = new Promise((resolve, reject) => {
+                            ws.onopen = function(event) {
+                                console.log('WebSocket connection established');
+                                resolve();
                             };
 
-                            // Close the modal when detection is completed
-                            if (data.status === 'completed' || data.status === 'error') {
-                                setTimeout(() => {
-                                    showProgressModal.value = false;
-                                    // Refresh stats after detection
-                                    fetchStats();
-                                    if (activeTab.value === 'search') {
-                                        fetchAttachments(); // Refresh search results if on search tab
-                                    }
-                                    progress.value = {
-                                        current: 0,
-                                        total: 0,
-                                        message: '',
-                                        status: ''
-                                    };
-                                }, 2000); // Wait 2 seconds to show completion message
-                            }
-                        };
+                            ws.onerror = function(error) {
+                                console.error('WebSocket error during connection:', error);
+                                reject(error);
+                            };
 
-                        // Handle WebSocket errors
-                        ws.onerror = function(error) {
-                            console.error('WebSocket error:', error);
-                            progress.value.status = 'error';
-                            progress.value.message = 'Connection error occurred';
-                        };
+                            // Handle WebSocket messages
+                            ws.onmessage = function(event) {
+                                const data = JSON.parse(event.data);
+                                progress.value = {
+                                    current: data.current,
+                                    total: data.total,
+                                    message: data.message,
+                                    status: data.status
+                                };
 
-                        // Handle WebSocket close
-                        ws.onclose = function() {
-                            console.log('WebSocket connection closed');
-                        };
+                                // Close the modal when detection is completed
+                                if (data.status === 'completed' || data.status === 'error') {
+                                    setTimeout(() => {
+                                        showProgressModal.value = false;
+                                        // Refresh stats after detection
+                                        fetchStats();
+                                        if (activeTab.value === 'search') {
+                                            fetchAttachments(); // Refresh search results if on search tab
+                                        }
+                                        progress.value = {
+                                            current: 0,
+                                            total: 0,
+                                            message: '',
+                                            status: ''
+                                        };
+                                    }, 2000); // Wait 2 seconds to show completion message
+                                }
+                            };
+
+                            // Handle WebSocket close
+                            ws.onclose = function() {
+                                console.log('WebSocket connection closed');
+                            };
+                        });
+
+                        // Wait for WebSocket to be established before making the API call
+                        await wsReady;
 
                         // Make the API call to start detection
                         const response = await fetch(`/api/detect-site/${detectionForm.value.site_owner}?detection_type=${detectionForm.value.type}&ws_id=${wsId}`, {
@@ -1898,6 +1943,7 @@
                         loading.value = false;
                     }
                 };
+
 
                 const getPreviewUrl = (urlPath) => {
                     if (!urlPath) return '';
@@ -2000,6 +2046,7 @@
                     showAttachmentDetails,
                     previewAttachment,
                     performDetection,
+                    downloadSiteAttachments,
                     getPreviewUrl,
                     cancelDetection,
                     renderCharts,
