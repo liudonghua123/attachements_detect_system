@@ -517,13 +517,69 @@
                             <table class="min-w-full divide-y divide-gray-200">
                                 <thead class="bg-gray-50">
                                     <tr>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">File Name</th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Site</th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Extension</th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created Date</th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Has ID Card</th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Has Phone</th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Verified Sensitive</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            <button @click="sortByField('show_name')" class="flex items-center focus:outline-none">
+                                                File Name
+                                                <i v-if="sortField === 'show_name' && sortOrder === 'asc'" class="fas fa-arrow-up ml-1"></i>
+                                                <i v-else-if="sortField === 'show_name' && sortOrder === 'desc'" class="fas fa-arrow-down ml-1"></i>
+                                            </button>
+                                        </th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            <button @click="sortByField('site_id')" class="flex items-center focus:outline-none">
+                                                Site
+                                                <i v-if="sortField === 'site_id' && sortOrder === 'asc'" class="fas fa-arrow-up ml-1"></i>
+                                                <i v-else-if="sortField === 'site_id' && sortOrder === 'desc'" class="fas fa-arrow-down ml-1"></i>
+                                            </button>
+                                        </th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            <button @click="sortByField('file_ext')" class="flex items-center focus:outline-none">
+                                                Extension
+                                                <i v-if="sortField === 'file_ext' && sortOrder === 'asc'" class="fas fa-arrow-up ml-1"></i>
+                                                <i v-else-if="sortField === 'file_ext' && sortOrder === 'desc'" class="fas fa-arrow-down ml-1"></i>
+                                            </button>
+                                        </th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            <button @click="sortByField('create_date')" class="flex items-center focus:outline-none">
+                                                Created Date
+                                                <i v-if="sortField === 'create_date' && sortOrder === 'asc'" class="fas fa-arrow-up ml-1"></i>
+                                                <i v-else-if="sortField === 'create_date' && sortOrder === 'desc'" class="fas fa-arrow-down ml-1"></i>
+                                            </button>
+                                        </th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            <button @click="sortByField('has_id_card')" class="flex items-center focus:outline-none">
+                                                Has ID Card
+                                                <i v-if="sortField === 'has_id_card' && sortOrder === 'asc'" class="fas fa-arrow-up ml-1"></i>
+                                                <i v-else-if="sortField === 'has_id_card' && sortOrder === 'desc'" class="fas fa-arrow-down ml-1"></i>
+                                            </button>
+                                        </th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            <button @click="sortByField('has_phone')" class="flex items-center focus:outline-none">
+                                                Has Phone
+                                                <i v-if="sortField === 'has_phone' && sortOrder === 'asc'" class="fas fa-arrow-up ml-1"></i>
+                                                <i v-else-if="sortField === 'has_phone' && sortOrder === 'desc'" class="fas fa-arrow-down ml-1"></i>
+                                            </button>
+                                        </th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            <button @click="sortByField('manual_verified_sensitive')" class="flex items-center focus:outline-none">
+                                                Verified Sensitive
+                                                <i v-if="sortField === 'manual_verified_sensitive' && sortOrder === 'asc'" class="fas fa-arrow-up ml-1"></i>
+                                                <i v-else-if="sortField === 'manual_verified_sensitive' && sortOrder === 'desc'" class="fas fa-arrow-down ml-1"></i>
+                                            </button>
+                                        </th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            <button @click="sortByField('processed_datetime')" class="flex items-center focus:outline-none">
+                                                Processed Date
+                                                <i v-if="sortField === 'processed_datetime' && sortOrder === 'asc'" class="fas fa-arrow-up ml-1"></i>
+                                                <i v-else-if="sortField === 'processed_datetime' && sortOrder === 'desc'" class="fas fa-arrow-down ml-1"></i>
+                                            </button>
+                                        </th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            <button @click="sortByField('ocr_score')" class="flex items-center focus:outline-none">
+                                                OCR Score
+                                                <i v-if="sortField === 'ocr_score' && sortOrder === 'asc'" class="fas fa-arrow-up ml-1"></i>
+                                                <i v-else-if="sortField === 'ocr_score' && sortOrder === 'desc'" class="fas fa-arrow-down ml-1"></i>
+                                            </button>
+                                        </th>
                                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                                     </tr>
                                 </thead>
@@ -564,6 +620,12 @@
                                             <span v-else class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
                                                 No
                                             </span>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                            {{ attachment.processed_datetime ? formatDate(attachment.processed_datetime) : '-' }}
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                            {{ attachment.ocr_score !== null ? attachment.ocr_score.toFixed(2) : '-' }}
                                         </td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm space-x-2">
                                             <button @click="processAttachment(attachment.id)" class="text-blue-600 hover:text-blue-900 hover:bg-blue-50 px-2 py-1 rounded transition" title="Process">
@@ -790,6 +852,14 @@
                                         <label class="block text-sm font-medium text-gray-700">Verification Notes</label>
                                         <p class="mt-1 text-sm text-gray-900">{{ selectedAttachment.verification_notes || 'No notes' }}</p>
                                     </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700">Processed Date</label>
+                                        <p class="mt-1 text-sm text-gray-900">{{ selectedAttachment.processed_datetime ? formatDate(selectedAttachment.processed_datetime) : 'Not processed' }}</p>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700">OCR Score</label>
+                                        <p class="mt-1 text-sm text-gray-900">{{ selectedAttachment.ocr_score !== null ? selectedAttachment.ocr_score.toFixed(2) : 'N/A' }}</p>
+                                    </div>
                                 </div>
                                 
                                 <div class="mb-4" v-if="selectedAttachment.text_content">
@@ -824,6 +894,7 @@
                                     >
                                         Close
                                     </button>
+                                    <!--
                                     <button 
                                         @click="processAttachment(selectedAttachment.id)" 
                                         class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center transition"
@@ -833,6 +904,7 @@
                                     <a :href="previewUrl" target="_blank" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center transition">
                                         <i class="fas fa-download mr-2"></i> Download
                                     </a>
+                                    -->
                                 </div>
                             </div>
                         </div>
@@ -1156,15 +1228,18 @@
                     pagination: {
                         offset: 0,
                         limit: 100
-                    }
+                    },
+                    sortField: null,
+                    sortOrder: 'asc'
                 });
-                
+
                 const {
                     activeTab, stats, sites, attachments, siteSuggestions, syncSiteSuggestions,
                     syncAttachmentSiteSuggestions, detectionSiteSuggestions, selectedAttachment,
                     totalResults, loading, syncInProgress, showAdvancedSearch, showDetailsModal,
                     showPreviewModal, showDetectionModal, showProgressModal, progress, syncStatus,
-                    cachedSites, searchForm, syncForm, syncAttachmentsForm, detectionForm, pagination
+                    cachedSites, searchForm, syncForm, syncAttachmentsForm, detectionForm, pagination,
+                    sortField, sortOrder
                 } = toRefs(state.value);
 
                 // Chart references
@@ -1272,7 +1347,11 @@
                         if (searchForm.value.has_phone !== null) params.append('has_phone', searchForm.value.has_phone.toString());
                         if (searchForm.value.file_ext) params.append('file_ext', searchForm.value.file_ext);
                         if (searchForm.value.manual_verified_sensitive !== null) params.append('manual_verified_sensitive', searchForm.value.manual_verified_sensitive.toString());
-                        
+
+                        // Add sorting parameters if they exist
+                        if (sortField.value) params.append('sort_by', sortField.value);
+                        if (sortOrder.value) params.append('sort_order', sortOrder.value);
+
                         const response = await fetch(`/api/attachments?${params}`);
                         if (!response.ok) throw new Error(`API error: ${response.status}`);
 
@@ -1370,6 +1449,19 @@
                         (site.account && site.account.toLowerCase().includes(query)) ||
                         (site.domain && site.domain.toLowerCase().includes(query))
                     ).slice(0, 5);
+                };
+
+                const sortByField = (field) => {
+                    if (sortField.value === field) {
+                        // If clicking the same field, toggle sort order
+                        sortOrder.value = sortOrder.value === 'asc' ? 'desc' : 'asc';
+                    } else {
+                        // If clicking a different field, sort by that field ascending
+                        sortField.value = field;
+                        sortOrder.value = 'asc';
+                    }
+                    // Perform search to apply sorting
+                    performSearch();
                 };
                 
                 const searchDetectionSites = async () => {
@@ -2009,6 +2101,8 @@
                     syncAttachmentsForm,
                     detectionForm,
                     pagination,
+                    sortField,
+                    sortOrder,
                     // Computed
                     isPreviewableImage,
                     isPreviewablePdf,
@@ -2055,7 +2149,8 @@
                     syncSites,
                     syncAttachments,
                     searchSyncAttachmentSites,
-                    selectSyncAttachmentSite
+                    selectSyncAttachmentSite,
+                    sortByField
                 };
             }
         }).mount('#app');

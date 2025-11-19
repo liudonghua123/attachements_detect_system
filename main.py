@@ -136,6 +136,8 @@ class AttachmentResponse(AttachmentBase):
     manual_verified_sensitive: bool
     verification_notes: Optional[str] = None
     create_date: Optional[datetime] = None
+    processed_datetime: Optional[datetime] = None
+    ocr_score: Optional[float] = None
 
 
 class SyncRequest(BaseModel):
@@ -226,6 +228,8 @@ def get_attachments(
     has_phone: Optional[bool] = Query(None),
     skip: int = 0,
     limit: int = 100,
+    sort_by: Optional[str] = Query(None),  # Field to sort by
+    sort_order: Optional[str] = Query("asc", regex="^(asc|desc)$"),  # Sort direction
     db: Session = Depends(get_db)
 ):
     query = db.query(Attachment)
@@ -257,6 +261,31 @@ def get_attachments(
     if site_state is not None:
         from sqlalchemy import and_
         query = query.join(Site, Attachment.site_id == Site.owner).filter(Site.state == site_state)
+
+    # Apply sorting if specified
+    from sqlalchemy import asc, desc
+    if sort_by:
+        # Map sort field to column (handle potential invalid field names)
+        column_map = {
+            'id': Attachment.id,
+            'site_id': Attachment.site_id,
+            'show_name': Attachment.show_name,
+            'file_ext': Attachment.file_ext,
+            'create_date': Attachment.create_date,
+            'text_content': Attachment.text_content,
+            'ocr_content': Attachment.ocr_content,
+            'has_id_card': Attachment.has_id_card,
+            'has_phone': Attachment.has_phone,
+            'manual_verified_sensitive': Attachment.manual_verified_sensitive,
+            'processed_datetime': Attachment.processed_datetime,
+            'ocr_score': Attachment.ocr_score
+        }
+
+        if sort_by in column_map:
+            if sort_order == "desc":
+                query = query.order_by(desc(column_map[sort_by]))
+            else:
+                query = query.order_by(asc(column_map[sort_by]))
 
     # Get total count
     total = query.count()

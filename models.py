@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, Column, Integer, String, DateTime, Text, Boolean
+from sqlalchemy import create_engine, Column, Integer, String, DateTime, Text, Boolean, Float
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from datetime import datetime
@@ -45,6 +45,10 @@ class Attachment(Base):
     # Manual verification fields
     manual_verified_sensitive = Column(Boolean, default=False)  # Whether manually verified to contain sensitive info
     verification_notes = Column(Text, default="")  # Notes for manual verification
+
+    # Additional attachment metadata
+    processed_datetime = Column(DateTime, default=None)  # When attachment was processed
+    ocr_score = Column(Float, default=None)  # Confidence score for OCR quality (null means not processed)
 
 
 def get_database_url():

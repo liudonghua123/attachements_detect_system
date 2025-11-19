@@ -171,10 +171,65 @@ def extract_text_from_ppt(ppt_path):
         return ""
 
 
+def calculate_ocr_confidence_score(ocr_results):
+    """Calculate an averaged confidence score for OCR results.
+
+    The score is based on the confidence scores returned by OCR engines.
+    Returns a float between 0 and 1 representing average confidence.
+    """
+    if not ocr_results:
+        return 0.0
+
+    # Different OCR engines return results in different formats:
+    # - PaddleOCR returns a list of [bbox, [text, confidence]] pairs
+    # - Tesseract might return different formats
+    total_confidence = 0.0
+    count = 0
+
+    # If ocr_results is a list (like PaddleOCR output)
+    if isinstance(ocr_results, list):
+        for result in ocr_results:
+            if isinstance(result, (list, tuple)) and len(result) > 1:
+                # PaddleOCR format: [bbox, [text, confidence]]
+                if isinstance(result[1], (list, tuple)) and len(result[1]) == 2:
+                    text, confidence = result[1]
+                    if isinstance(confidence, (int, float)):
+                        total_confidence += confidence
+                        count += 1
+                # Alternative format: [[x1,y1,x2,y2,text,confidence], ...]
+                elif isinstance(result, (list, tuple)) and len(result) >= 6:
+                    try:
+                        confidence = float(result[5])  # Assuming 6th element is confidence
+                        total_confidence += confidence
+                        count += 1
+                    except (ValueError, IndexError):
+                        # If confidence value is not a valid number or index out of bounds, skip
+                        continue
+    # If ocr_results is a dictionary (Tesseract format)
+    elif isinstance(ocr_results, dict):
+        if 'conf' in ocr_results and isinstance(ocr_results['conf'], (list, tuple)):
+            confidences = ocr_results['conf']
+            for conf in confidences:
+                try:
+                    if conf != -1:  # Tesseract uses -1 for no confidence score
+                        total_confidence += float(conf) / 100  # Convert Tesseract confidence (0-100) to 0-1
+                        count += 1
+                except (ValueError, TypeError):
+                    continue
+
+    if count == 0:
+        return 0.0
+
+    avg_confidence = total_confidence / count
+
+    # Ensure result is between 0 and 1
+    return max(0.0, min(1.0, avg_confidence))
+
+
 def extract_ocr_from_image(image_path):
     """Extract text from image using configured OCR engine"""
     initialize_ocr()
-    
+
     if OCR_ENGINE == 'paddle' and PADDLE_OCR_AVAILABLE:
         try:
             result = paddle_ocr.ocr(image_path, cls=True)
@@ -206,10 +261,43 @@ def extract_ocr_from_image(image_path):
             return f"Unsupported OCR engine: {OCR_ENGINE}"
 
 
+def extract_ocr_from_image_with_confidence(image_path):
+    """Extract text from image using configured OCR engine and return results with confidence scores for calculating OCR score"""
+    initialize_ocr()
+
+    if OCR_ENGINE == 'paddle' and PADDLE_OCR_AVAILABLE:
+        try:
+            result = paddle_ocr.ocr(image_path, cls=True)
+            # Return the raw result for confidence calculation
+            return result
+        except Exception as e:
+            print(f"Error performing PaddleOCR on image {image_path}: {str(e)}")
+            return []
+    elif OCR_ENGINE == 'tesseract' and TESSERACT_OCR_AVAILABLE:
+        try:
+            from PIL import Image
+            import pytesseract
+            img = Image.open(image_path)
+            # Get data with confidence scores
+            data = pytesseract.image_to_data(img, lang='chi_sim+eng', output_type=pytesseract.Output.DICT)
+            return data
+        except Exception as e:
+            print(f"Error performing Tesseract OCR with confidence on image {image_path}: {str(e)}")
+            return {}
+    else:
+        if OCR_ENGINE == 'paddle':
+            print("PaddleOCR not available - please install paddlepaddle and paddleocr packages")
+        elif OCR_ENGINE == 'tesseract':
+            print("Tesseract not available - please install pytesseract package")
+        else:
+            print(f"Unsupported OCR engine: {OCR_ENGINE}")
+        return [] if OCR_ENGINE == 'paddle' else {}
+
+
 def extract_ocr_from_pdf(pdf_path):
     """Extract text from PDF using OCR (for image-based PDFs)"""
     initialize_ocr()
-    
+
     if OCR_ENGINE == 'paddle' and not PADDLE_OCR_AVAILABLE:
         if OCR_ENGINE == 'paddle':
             return "PaddleOCR not available - please install paddlepaddle and paddleocr packages"
@@ -217,7 +305,7 @@ def extract_ocr_from_pdf(pdf_path):
             return "Tesseract not available - please install pytesseract package"
         else:
             return f"Unsupported OCR engine: {OCR_ENGINE}"
-    
+
     try:
         # For image-based PDFs, we need to convert each page to an image first
         import fitz  # PyMuPDF
@@ -243,6 +331,50 @@ def extract_ocr_from_pdf(pdf_path):
     except Exception as e:
         print(f"Error performing OCR on PDF {pdf_path}: {str(e)}")
         return ""
+
+
+def extract_ocr_from_pdf_with_confidence(pdf_path):
+    """Extract text from PDF using OCR (for image-based PDFs) and return results with confidence scores"""
+    initialize_ocr()
+
+    if OCR_ENGINE == 'paddle' and not PADDLE_OCR_AVAILABLE:
+        if OCR_ENGINE == 'paddle':
+            print("PaddleOCR not available - please install paddlepaddle and paddleocr packages")
+            return []
+        elif OCR_ENGINE == 'tesseract':
+            print("Tesseract not available - please install pytesseract package")
+            return []
+        else:
+            print(f"Unsupported OCR engine: {OCR_ENGINE}")
+            return []
+
+    try:
+        # For image-based PDFs, we need to convert each page to an image first
+        import fitz  # PyMuPDF
+
+        doc = fitz.open(pdf_path)
+        all_results = []
+
+        for page_num in range(len(doc)):
+            page = doc.load_page(page_num)
+            pix = page.get_pixmap()
+
+            # Save as temporary image
+            with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp_file:
+                pix.save(tmp_file.name)
+                # Get OCR results with confidence
+                from utils import extract_ocr_from_image_with_confidence
+                page_results = extract_ocr_from_image_with_confidence(tmp_file.name)
+                all_results.extend(page_results if isinstance(page_results, list) else [page_results])
+
+                # Clean up temporary file
+                os.unlink(tmp_file.name)
+
+        doc.close()
+        return all_results
+    except Exception as e:
+        print(f"Error performing OCR with confidence on PDF {pdf_path}: {str(e)}")
+        return []
 
 
 def extract_text_from_file(file_path):

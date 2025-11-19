@@ -144,6 +144,9 @@ def process_attachment_file(attachment: Attachment, db: Session, base_url: str =
         text_content = ""
         ocr_content = ""
 
+        # Store OCR scores for files in archive
+        archive_ocr_scores = []
+
         for root, dirs, files in os.walk(extract_dir):
             for file in files:
                 file_path = os.path.join(root, file)
@@ -157,6 +160,25 @@ def process_attachment_file(attachment: Attachment, db: Session, base_url: str =
                 if file_ext in ['.jpg', '.jpeg', '.png', '.bmp', '.gif', '.tiff', '.pdf']:
                     file_ocr = extract_text_from_file(file_path)
                     ocr_content += file_ocr + "\n"
+
+                    # Calculate OCR confidence for this file if it's an image/PDF
+                    if file_ext == '.pdf':
+                        from utils import extract_ocr_from_pdf_with_confidence, calculate_ocr_confidence_score
+                        ocr_results = extract_ocr_from_pdf_with_confidence(file_path)
+                        file_ocr_score = calculate_ocr_confidence_score(ocr_results)
+                    else:
+                        from utils import extract_ocr_from_image_with_confidence, calculate_ocr_confidence_score
+                        ocr_results = extract_ocr_from_image_with_confidence(file_path)
+                        file_ocr_score = calculate_ocr_confidence_score(ocr_results)
+
+                    if file_ocr_score is not None:
+                        archive_ocr_scores.append(file_ocr_score)
+
+        # If we have multiple OCR scores from archive files, compute an average
+        if archive_ocr_scores:
+            combined_ocr_score = sum(archive_ocr_scores) / len(archive_ocr_scores)
+        else:
+            combined_ocr_score = None
     else:
         # Extract content from the file directly
         text_content = extract_text_from_file(cached_path)
@@ -165,6 +187,25 @@ def process_attachment_file(attachment: Attachment, db: Session, base_url: str =
         ocr_content = ""
         if extracted_ext in ['.jpg', '.jpeg', '.png', '.bmp', '.gif', '.tiff', '.pdf']:
             ocr_content = extract_text_from_file(cached_path)  # This will use OCR for images
+
+    # Calculate OCR score if not in archive case
+    if extracted_ext.lstrip('.') not in ['.zip', '.rar']:
+        # For non-archive files, calculate the OCR confidence score for image types
+        if extracted_ext and extracted_ext.lstrip('.') in ['jpg', 'jpeg', 'png', 'bmp', 'gif', 'tiff', 'pdf']:
+            if extracted_ext.lstrip('.') in ['pdf']:
+                # For PDFs, we need to get confidence scores from the PDF OCR process
+                from utils import extract_ocr_from_pdf_with_confidence, calculate_ocr_confidence_score
+                # For PDF files, we need to process each page/image and get confidence scores
+                ocr_results = extract_ocr_from_pdf_with_confidence(cached_path)
+                ocr_score = calculate_ocr_confidence_score(ocr_results)
+            else:
+                # For image files, get confidence directly
+                from utils import extract_ocr_from_image_with_confidence, calculate_ocr_confidence_score
+                ocr_results = extract_ocr_from_image_with_confidence(cached_path)
+                ocr_score = calculate_ocr_confidence_score(ocr_results)
+    else:
+        # For archive files, we already calculated this above
+        ocr_score = combined_ocr_score
 
     # Process based on detection type
     if detection_type == "ai" and settings.OPENAI_API_KEY:
@@ -191,6 +232,9 @@ def process_attachment_file(attachment: Attachment, db: Session, base_url: str =
     attachment.llm_content = llm_content
     attachment.has_id_card = has_id_card
     attachment.has_phone = has_phone
+    attachment.ocr_score = ocr_score  # Store the calculated OCR score
+    from datetime import datetime
+    attachment.processed_datetime = datetime.utcnow()  # Update the processed time
 
     # If sensitive info is detected, mark for manual verification
     if has_id_card or has_phone:
@@ -198,7 +242,7 @@ def process_attachment_file(attachment: Attachment, db: Session, base_url: str =
         attachment.verification_notes = f"Auto-detected: ID card={has_id_card}, Phone={has_phone}"
 
     db.commit()
-    print(f"Processed attachment {attachment.id}: ID card={has_id_card}, Phone={has_phone}, Manual verification required={has_id_card or has_phone}, File extension: {extracted_ext}")
+    print(f"Processed attachment {attachment.id}: ID card={has_id_card}, Phone={has_phone}, Manual verification required={has_id_card or has_phone}, File extension: {extracted_ext}, OCR Score: {ocr_score}")
 
     # Call progress callback if provided
     if progress_callback:
